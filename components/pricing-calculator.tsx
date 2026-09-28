@@ -38,6 +38,7 @@ type NamedRow = {
   generatedAutomationRecords?: string;
   description?: string;
   diagram?: string;
+  diagramGenerating?: boolean;
   bubbleColor?: string;
   generating?: boolean;
   revealing?: boolean;
@@ -444,9 +445,7 @@ export function PricingCalculator({
     initialForm ? initialForm.automations : starterAutomations,
   );
   const [nextAutomationId, setNextAutomationId] = useState(
-    initialForm
-      ? initialForm.nextAutomationId
-      : starterAutomations.length + 1,
+    initialForm ? initialForm.nextAutomationId : starterAutomations.length + 1,
   );
   const sourcesRef = useRef(sources);
   const projectsRef = useRef(projects);
@@ -460,6 +459,8 @@ export function PricingCalculator({
   const hydrating = useRef(true);
   const focusNameId = useRef<string | null>(null);
   const requestedProjectNames = useRef(new Set<string>());
+  const diagramTimers = useRef(new Map<string, number>());
+  const diagramTitles = useRef(new Map<string, string>());
   const [apps, setApps] = useState<KnownApp[]>([]);
   const sourceOptions = useMemo<SourceOption[]>(
     () =>
@@ -847,7 +848,14 @@ export function PricingCalculator({
         window.clearTimeout(saveTimer.current);
       }
     };
-  }, [sources, projects, automations, nextSourceId, nextProjectId, nextAutomationId]);
+  }, [
+    sources,
+    projects,
+    automations,
+    nextSourceId,
+    nextProjectId,
+    nextAutomationId,
+  ]);
 
   function updateSource(
     id: string,
@@ -883,6 +891,107 @@ export function PricingCalculator({
     document.getElementById(id)?.focus();
   }, [sources, projects, automations]);
 
+  function applyDiagram(
+    kind: GeneratedKind,
+    id: string,
+    patch: Partial<
+      Pick<
+        NamedRow,
+        "diagram" | "diagramGenerating" | "description" | "bubbleColor"
+      >
+    >,
+  ) {
+    const fields = bucket(kind);
+    fields.setRows((current) => {
+      const next = current.map((row) => {
+        if (row.id !== id) {
+          return row;
+        }
+
+        const updated = { ...row, ...patch };
+        if (updated.description && !updated.bubbleColor) {
+          updated.bubbleColor = randomBubbleColor();
+        }
+        return updated;
+      });
+      fields.rowsRef.current = next;
+      return next;
+    });
+  }
+
+  function scheduleDiagram(kind: GeneratedKind, id: string, name: string) {
+    const key = `${kind}:${id}`;
+    const existing = diagramTimers.current.get(key);
+    if (existing) {
+      window.clearTimeout(existing);
+    }
+
+    const title = name.trim();
+    diagramTitles.current.set(key, title);
+    if (title === "") {
+      applyDiagram(kind, id, {
+        diagram: "",
+        description: "",
+        diagramGenerating: false,
+      });
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      applyDiagram(kind, id, { diagramGenerating: true });
+      const fields = bucket(kind);
+      const source = sourcesRef.current.find(
+        (item) => item[fields.linkedId] === id,
+      );
+      const sourceName = source ? source.name.trim() : "";
+
+      void fetch("/api/project-name", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind, name: title, sourceName }),
+      })
+        .then(async (response) => {
+          if (diagramTitles.current.get(key) !== title) {
+            return;
+          }
+          if (!response.ok) {
+            applyDiagram(kind, id, { diagramGenerating: false });
+            return;
+          }
+
+          const payload = (await response.json()) as {
+            diagram?: unknown;
+            description?: unknown;
+          };
+          if (diagramTitles.current.get(key) !== title) {
+            return;
+          }
+          if (
+            typeof payload.diagram !== "string" ||
+            payload.diagram.trim() === "" ||
+            typeof payload.description !== "string" ||
+            payload.description.trim() === ""
+          ) {
+            applyDiagram(kind, id, { diagramGenerating: false });
+            return;
+          }
+
+          applyDiagram(kind, id, {
+            diagram: payload.diagram.trim(),
+            description: payload.description.trim(),
+            diagramGenerating: false,
+          });
+        })
+        .catch(() => {
+          if (diagramTitles.current.get(key) !== title) {
+            return;
+          }
+          applyDiagram(kind, id, { diagramGenerating: false });
+        });
+    }, 500);
+    diagramTimers.current.set(key, timer);
+  }
+
   function addSource() {
     const id = `source-${nextSourceId}`;
     focusNameId.current = `${id}-name`;
@@ -908,6 +1017,9 @@ export function PricingCalculator({
       projectsRef.current = next;
       return next;
     });
+    if (patch.name !== undefined) {
+      scheduleDiagram("project", id, patch.name);
+    }
   }
 
   function removeProject(id: string) {
@@ -948,6 +1060,9 @@ export function PricingCalculator({
       automationsRef.current = next;
       return next;
     });
+    if (patch.name !== undefined) {
+      scheduleDiagram("automation", id, patch.name);
+    }
   }
 
   function removeAutomation(id: string) {
@@ -1117,9 +1232,16 @@ export function PricingCalculator({
                       <Trash2 />
                     </Button>
                   </div>
-                  {project.diagram ? (
+                  {project.diagram || project.diagramGenerating ? (
                     <div className="col-span-full">
-                      <MermaidDiagram chart={project.diagram} />
+                      {project.diagramGenerating ? (
+                        <p className="mb-2 text-sm text-muted-foreground">
+                          Updating diagram
+                        </p>
+                      ) : null}
+                      {project.diagram ? (
+                        <MermaidDiagram chart={project.diagram} />
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -1157,9 +1279,7 @@ export function PricingCalculator({
                         placeholder={
                           automation.generating ? "" : automation.placeholder
                         }
-                        readOnly={
-                          automation.generating || automation.revealing
-                        }
+                        readOnly={automation.generating || automation.revealing}
                         aria-busy={automation.generating}
                         onChange={(event) => {
                           updateAutomation(automation.id, {
@@ -1199,9 +1319,16 @@ export function PricingCalculator({
                       <Trash2 />
                     </Button>
                   </div>
-                  {automation.diagram ? (
+                  {automation.diagram || automation.diagramGenerating ? (
                     <div className="col-span-full">
-                      <MermaidDiagram chart={automation.diagram} />
+                      {automation.diagramGenerating ? (
+                        <p className="mb-2 text-sm text-muted-foreground">
+                          Updating diagram
+                        </p>
+                      ) : null}
+                      {automation.diagram ? (
+                        <MermaidDiagram chart={automation.diagram} />
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -1228,7 +1355,7 @@ export function PricingCalculator({
           <dl className="flex flex-col gap-4">
             <div className="flex items-start justify-between gap-4">
               <EstimateHint
-                label="Source records"
+                label="Sources"
                 hint="The records stored in each data source."
               />
               <dd className="text-right">
@@ -1242,7 +1369,7 @@ export function PricingCalculator({
             </div>
             <div className="flex items-start justify-between gap-4">
               <EstimateHint
-                label="Project records"
+                label="Projects"
                 hint="Projects update hourly but only count towards usage 1x per day. That daily total is billed across the month."
               />
               <dd className="text-right">
