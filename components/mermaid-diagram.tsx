@@ -18,6 +18,15 @@ export function MermaidDiagram({ chart }: { chart: string }) {
         suppressErrorRendering: true,
         htmlLabels: false,
         theme: "neutral",
+        themeVariables: {
+          fontSize: "12px",
+          radius: 8,
+        },
+        flowchart: {
+          useMaxWidth: false,
+          minNodeWidth: 50,
+          wrappingWidth: 200,
+        },
       });
 
       try {
@@ -43,7 +52,7 @@ export function MermaidDiagram({ chart }: { chart: string }) {
 
   return (
     <div
-      className="max-h-96 w-full overflow-auto rounded-xl border bg-background p-2 [&_svg]:block [&_svg]:h-auto [&_svg]:!w-full [&_svg]:!max-w-none"
+      className="w-full overflow-x-auto rounded-xl border bg-background p-2 [&_svg]:block [&_svg]:h-auto [&_svg]:max-w-none [&_svg_rect.label-container]:[rx:8px] [&_svg_rect.label-container]:[ry:8px]"
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   );
