@@ -145,6 +145,17 @@ export function parseSavedForm(value: unknown): SavedForm | null {
     }
     nextAutomationId = parsed
   }
+  if (automations.length === 0) {
+    automations = [
+      {
+        id: `automation-${nextAutomationId}`,
+        name: "",
+        placeholder: "Automation name",
+        records: "",
+      },
+    ]
+    nextAutomationId += 1
+  }
 
   let whiteGlove = false
   if (value.whiteGlove !== undefined) {

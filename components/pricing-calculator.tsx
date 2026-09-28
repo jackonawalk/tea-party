@@ -880,12 +880,27 @@ export function PricingCalculator({
   }
 
   function removeSource(id: string) {
+    const isLast = sources.length === 1 && sources[0].id === id;
+    let blank: NamedRow | null = null;
+    if (isLast) {
+      const blankId = `source-${nextSourceId}`;
+      focusNameId.current = `${blankId}-name`;
+      setNextSourceId(nextSourceId + 1);
+      blank = {
+        id: blankId,
+        name: "",
+        placeholder: "Source name",
+        records: "",
+      };
+    }
+
     setSources((current) => {
-      if (current.length <= 1) {
-        return current;
+      const next = current.filter((source) => source.id !== id);
+      if (next.length === 0 && blank) {
+        sourcesRef.current = [blank];
+        return [blank];
       }
 
-      const next = current.filter((source) => source.id !== id);
       sourcesRef.current = next;
       return next;
     });
@@ -1032,12 +1047,28 @@ export function PricingCalculator({
   }
 
   function removeProject(id: string) {
+    const isLast = projects.length === 1 && projects[0].id === id;
+    let blank: NamedRow | null = null;
+    if (isLast) {
+      const blankId = `project-${nextProjectIdRef.current}`;
+      nextProjectIdRef.current += 1;
+      setNextProjectId(nextProjectIdRef.current);
+      focusNameId.current = `${blankId}-name`;
+      blank = {
+        id: blankId,
+        name: "",
+        placeholder: "Project name",
+        records: "",
+      };
+    }
+
     setProjects((current) => {
-      if (current.length <= 1) {
-        return current;
+      const next = current.filter((project) => project.id !== id);
+      if (next.length === 0 && blank) {
+        projectsRef.current = [blank];
+        return [blank];
       }
 
-      const next = current.filter((project) => project.id !== id);
       projectsRef.current = next;
       return next;
     });
@@ -1075,8 +1106,28 @@ export function PricingCalculator({
   }
 
   function removeAutomation(id: string) {
+    const isLast = automations.length === 1 && automations[0].id === id;
+    let blank: NamedRow | null = null;
+    if (isLast) {
+      const blankId = `automation-${nextAutomationIdRef.current}`;
+      nextAutomationIdRef.current += 1;
+      setNextAutomationId(nextAutomationIdRef.current);
+      focusNameId.current = `${blankId}-name`;
+      blank = {
+        id: blankId,
+        name: "",
+        placeholder: "Automation name",
+        records: "",
+      };
+    }
+
     setAutomations((current) => {
       const next = current.filter((automation) => automation.id !== id);
+      if (next.length === 0 && blank) {
+        automationsRef.current = [blank];
+        return [blank];
+      }
+
       automationsRef.current = next;
       return next;
     });
@@ -1158,7 +1209,6 @@ export function PricingCalculator({
                     variant="ghost"
                     size="icon"
                     aria-label={`Remove ${source.name || source.placeholder || "source"}`}
-                    disabled={sources.length <= 1}
                     onClick={() => {
                       removeSource(source.id);
                     }}
@@ -1229,7 +1279,6 @@ export function PricingCalculator({
                       variant="ghost"
                       size="icon"
                       aria-label={`Remove ${project.name || project.placeholder || "project"}`}
-                      disabled={projects.length <= 1}
                       onClick={() => {
                         removeProject(project.id);
                       }}
@@ -1261,7 +1310,7 @@ export function PricingCalculator({
         </fieldset>
 
         <fieldset className="flex flex-col gap-4">
-          <legend className="text-sm font-medium">Automations</legend>
+          <legend className="text-sm font-medium sr-only">Automations</legend>
           <div className="flex flex-col gap-3">
             {automations.map((automation) => {
               const nameId = `${automation.id}-name`;
