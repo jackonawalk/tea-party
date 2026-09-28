@@ -221,26 +221,21 @@ const sourceSelectStyles: StylesConfig<SourceOption, false> = {
 
 function GeneratedReply({
   description,
-  diagram,
   bubbleColor,
 }: {
   description: string;
-  diagram?: string;
   bubbleColor?: string;
 }) {
   return (
-    <>
-      <p
-        className={`relative ml-1 mt-2.5 w-fit max-w-full rounded-2xl px-3 py-2 text-sm animate-in fade-in slide-in-from-bottom-2 duration-500 ${bubbleColor}`}
-      >
-        <span
-          aria-hidden
-          className="absolute -top-2.5 left-4 h-3.5 w-5 bg-inherit [clip-path:path('M_0_14_L_9_1.5_Q_10_0_11_1.5_L_20_14_Z')]"
-        />
-        “{description}”
-      </p>
-      {diagram ? <MermaidDiagram chart={diagram} /> : null}
-    </>
+    <p
+      className={`relative ml-1 mt-2.5 w-fit max-w-full rounded-2xl px-3 py-2 text-sm animate-in fade-in slide-in-from-bottom-2 duration-500 ${bubbleColor}`}
+    >
+      <span
+        aria-hidden
+        className="absolute -top-2.5 left-4 h-3.5 w-5 bg-inherit [clip-path:path('M_0_14_L_9_1.5_Q_10_0_11_1.5_L_20_14_Z')]"
+      />
+      “{description}”
+    </p>
   );
 }
 
@@ -1097,7 +1092,6 @@ export function PricingCalculator({
                     {project.description ? (
                       <GeneratedReply
                         description={project.description}
-                        diagram={project.diagram}
                         bubbleColor={project.bubbleColor}
                       />
                     ) : null}
@@ -1123,6 +1117,11 @@ export function PricingCalculator({
                       <Trash2 />
                     </Button>
                   </div>
+                  {project.diagram ? (
+                    <div className="col-span-full">
+                      <MermaidDiagram chart={project.diagram} />
+                    </div>
+                  ) : null}
                 </div>
               );
             })}
@@ -1175,7 +1174,6 @@ export function PricingCalculator({
                     {automation.description ? (
                       <GeneratedReply
                         description={automation.description}
-                        diagram={automation.diagram}
                         bubbleColor={automation.bubbleColor}
                       />
                     ) : null}
@@ -1201,6 +1199,11 @@ export function PricingCalculator({
                       <Trash2 />
                     </Button>
                   </div>
+                  {automation.diagram ? (
+                    <div className="col-span-full">
+                      <MermaidDiagram chart={automation.diagram} />
+                    </div>
+                  ) : null}
                 </div>
               );
             })}
