@@ -17,19 +17,6 @@ export type PricedRow = {
   amount: number
 }
 
-export type QuoteInput = {
-  totalRecords: number
-  projectRecords: number
-}
-
-export type Quote = {
-  totalRecords: number
-  projectRecords: number
-  sourceAmount: number
-  projectAmount: number
-  monthlyTotal: number
-}
-
 export type PricedQuote = {
   currency: "USD"
   pricePerMillion: number
@@ -52,19 +39,6 @@ export type PricedQuote = {
 
 function priceForRecords(records: number, rate: number) {
   return (records / recordsPerMillion) * rate
-}
-
-export function quote(input: QuoteInput): Quote {
-  const sourceAmount = priceForRecords(input.totalRecords, pricePerMillion)
-  const projectAmount = priceForRecords(input.projectRecords, pricePerMillion)
-
-  return {
-    totalRecords: input.totalRecords,
-    projectRecords: input.projectRecords,
-    sourceAmount,
-    projectAmount,
-    monthlyTotal: sourceAmount + projectAmount,
-  }
 }
 
 function priceRows(
@@ -96,9 +70,10 @@ export function priceUsage(input: {
   const sourceRecords = sources.reduce((sum, row) => sum + row.records, 0)
   const projectRecords = projects.reduce((sum, row) => sum + row.records, 0)
   const automationRecords = automations.reduce((sum, row) => sum + row.records, 0)
-  const priced = quote({ totalRecords: sourceRecords, projectRecords })
+  const sourceAmount = priceForRecords(sourceRecords, pricePerMillion)
+  const projectAmount = priceForRecords(projectRecords, pricePerMillion)
   const automationAmount = automations.reduce((sum, row) => sum + row.amount, 0)
-  const spend = priced.monthlyTotal + automationAmount
+  const spend = sourceAmount + projectAmount + automationAmount
   const whiteGloveAmount = input.whiteGlove ? spend * whiteGloveRate : 0
 
   return {
@@ -109,10 +84,10 @@ export function priceUsage(input: {
     sources,
     projects,
     automations,
-    sourceRecords: priced.totalRecords,
-    sourceAmount: priced.sourceAmount,
-    projectRecords: priced.projectRecords,
-    projectAmount: priced.projectAmount,
+    sourceRecords,
+    sourceAmount,
+    projectRecords,
+    projectAmount,
     automationRecords,
     automationAmount,
     whiteGlove: input.whiteGlove,

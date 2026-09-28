@@ -5,13 +5,7 @@ import { Eye, EyeOff, Info, Trash2 } from "lucide-react";
 import CreatableSelect from "react-select/creatable";
 import type { StylesConfig } from "react-select";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -471,13 +465,23 @@ function sameForm(left: SavedForm, right: SavedForm) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function fifthOfRecords(records: string) {
-  const amount = parseCount(records) / 5;
+const projectShareOfSource = 0.2;
+const automationShareOfProject = 0.1;
+
+function suggestedRecords(
+  kind: "project" | "automation",
+  sourceRecords: string,
+) {
+  const projectRecords = parseCount(sourceRecords) * projectShareOfSource;
+  const amount =
+    kind === "project"
+      ? projectRecords
+      : projectRecords * automationShareOfProject;
   if (!Number.isFinite(amount) || amount <= 0) {
     return "0";
   }
 
-  return String(Math.round(amount * 1000) / 1000);
+  return String(Math.round(amount * 10000) / 10000);
 }
 
 export function PricingCalculator({
@@ -680,7 +684,7 @@ export function PricingCalculator({
       return;
     }
 
-    const records = fifthOfRecords(source.records);
+    const records = suggestedRecords(kind, source.records);
 
     setSources((current) => {
       const next = current.map((item) => {

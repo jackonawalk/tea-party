@@ -43,7 +43,7 @@ export function MermaidDiagram({ chart }: { chart: string }) {
 
   return (
     <div
-      className="w-full overflow-x-auto rounded-xl border bg-background p-2 [&_svg]:block [&_svg]:h-auto [&_svg]:!w-full [&_svg]:!max-w-none"
+      className="max-h-96 w-full overflow-auto rounded-xl border bg-background p-2 [&_svg]:block [&_svg]:h-auto [&_svg]:!w-full [&_svg]:!max-w-none"
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   );
