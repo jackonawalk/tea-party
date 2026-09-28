@@ -12,6 +12,7 @@ export type SavedRow = {
   generatedAutomationName?: string
   generatedAutomationRecords?: string
   description?: string
+  diagram?: string
   bubbleColor?: string
 }
 
@@ -34,6 +35,7 @@ const optionalKeys = [
   "generatedAutomationName",
   "generatedAutomationRecords",
   "description",
+  "diagram",
   "bubbleColor",
 ] as const
 

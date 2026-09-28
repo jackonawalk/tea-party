@@ -1,12 +1,29 @@
 import OpenAI from "openai"
 
+function mermaidSource(value: unknown) {
+  if (typeof value !== "string") {
+    return null
+  }
+
+  let text = value.trim()
+  if (text.startsWith("```")) {
+    text = text.replace(/^```(?:mermaid)?\s*/i, "").replace(/```\s*$/, "").trim()
+  }
+  if (!/^(flowchart|graph|erDiagram|classDiagram)\b/.test(text)) {
+    return null
+  }
+
+  return text
+}
+
 const projectNameSchema = {
   type: "object",
   properties: {
     name: { type: "string" },
     description: { type: "string" },
+    diagram: { type: "string" },
   },
-  required: ["name", "description"],
+  required: ["name", "description", "diagram"],
   additionalProperties: false,
 } as const
 
@@ -41,8 +58,8 @@ export async function POST(request: Request) {
 
   const prompt =
     kind === "automation"
-      ? `Suggest one short automation name a customer would run from ${sourceName} data. Write the description as a short request the customer would type, in the style of "Notify me when a deal stalls" or "Post closed revenue to the channel". Do not describe the product, and do not start every description with "Notify me".`
-      : `Suggest one short project name a customer would build from ${sourceName} data. Write the description as a short request the customer would type, in the style of "Show me pipeline health by rep" or "Compare revenue to closed deals". Do not describe the product, and do not start every description with "Show me".`
+      ? `Suggest one short automation name a customer would run from ${sourceName} data. Write the description as a short request the customer would type, in the style of "Notify me when a deal stalls" or "Post closed revenue to the channel". Do not describe the product, and do not start every description with "Notify me". Also include a mermaid flowchart of the relevant data objects this automation reads and writes. Put only the mermaid source in diagram, with no code fences.`
+      : `Suggest one short project name a customer would build from ${sourceName} data. Write the description as a short request the customer would type, in the style of "Show me pipeline health by rep" or "Compare revenue to closed deals". Do not describe the product, and do not start every description with "Show me". Also include a mermaid flowchart of the relevant data objects this project uses. Put only the mermaid source in diagram, with no code fences.`
 
   try {
     const client = new OpenAI({ apiKey })
@@ -64,12 +81,15 @@ export async function POST(request: Request) {
     const parsed = JSON.parse(response.output_text) as {
       name?: unknown
       description?: unknown
+      diagram?: unknown
     }
+    const diagram = mermaidSource(parsed.diagram)
     if (
       typeof parsed.name !== "string" ||
       parsed.name.trim() === "" ||
       typeof parsed.description !== "string" ||
-      parsed.description.trim() === ""
+      parsed.description.trim() === "" ||
+      diagram === null
     ) {
       return Response.json({ error: "No project name" }, { status: 502 })
     }
@@ -77,6 +97,7 @@ export async function POST(request: Request) {
     return Response.json({
       name: parsed.name.trim(),
       description: parsed.description.trim(),
+      diagram,
     })
   } catch {
     return Response.json({ error: "Project name request failed" }, { status: 502 })

@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/tooltip";
 import { priceUsage } from "@/lib/pricing";
 import type { SavedForm, SavedRow } from "@/lib/saved-form";
+import { MermaidDiagram } from "@/components/mermaid-diagram";
 
 type NamedRow = {
   id: string;
@@ -36,6 +37,7 @@ type NamedRow = {
   generatedAutomationName?: string;
   generatedAutomationRecords?: string;
   description?: string;
+  diagram?: string;
   bubbleColor?: string;
   generating?: boolean;
   revealing?: boolean;
@@ -217,6 +219,31 @@ const sourceSelectStyles: StylesConfig<SourceOption, false> = {
   }),
 };
 
+function GeneratedReply({
+  description,
+  diagram,
+  bubbleColor,
+}: {
+  description: string;
+  diagram?: string;
+  bubbleColor?: string;
+}) {
+  return (
+    <>
+      <p
+        className={`relative ml-1 mt-2.5 w-fit max-w-full rounded-2xl px-3 py-2 text-sm animate-in fade-in slide-in-from-bottom-2 duration-500 ${bubbleColor}`}
+      >
+        <span
+          aria-hidden
+          className="absolute -top-2.5 left-4 h-3.5 w-5 bg-inherit [clip-path:path('M_0_14_L_9_1.5_Q_10_0_11_1.5_L_20_14_Z')]"
+        />
+        “{description}”
+      </p>
+      {diagram ? <MermaidDiagram chart={diagram} /> : null}
+    </>
+  );
+}
+
 function GeneratingHint({ label }: { label: string }) {
   return (
     <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center gap-1.5 text-sm">
@@ -349,6 +376,9 @@ function savedRow(row: NamedRow): SavedRow {
   }
   if (row.description) {
     saved.description = row.description;
+  }
+  if (row.diagram) {
+    saved.diagram = row.diagram;
   }
   if (row.bubbleColor) {
     saved.bubbleColor = row.bubbleColor;
@@ -534,6 +564,7 @@ export function PricingCalculator({
               ...row,
               name: "",
               description: "",
+              diagram: "",
               records: "",
               generating: true,
             }
@@ -581,6 +612,7 @@ export function PricingCalculator({
     rowId: string,
     rowName: string,
     description: string,
+    diagram: string,
   ) {
     const fields = bucket(kind);
     const source = sourcesRef.current.find((item) => item.id === sourceId);
@@ -591,21 +623,23 @@ export function PricingCalculator({
 
     const records = fifthOfRecords(source.records);
 
-    const nextSources = sourcesRef.current.map((item) => {
-      if (item.id !== sourceId || item.name.trim() !== sourceName) {
-        return item;
-      }
+    setSources((current) => {
+      const next = current.map((item) => {
+        if (item.id !== sourceId || item.name.trim() !== sourceName) {
+          return item;
+        }
 
-      return {
-        ...item,
-        [fields.generatedFor]: sourceName,
-        [fields.linkedId]: rowId,
-        [fields.generatedName]: rowName,
-        [fields.generatedRecords]: records,
-      };
+        return {
+          ...item,
+          [fields.generatedFor]: sourceName,
+          [fields.linkedId]: rowId,
+          [fields.generatedName]: rowName,
+          [fields.generatedRecords]: records,
+        };
+      });
+      sourcesRef.current = next;
+      return next;
     });
-    sourcesRef.current = nextSources;
-    setSources(nextSources);
 
     let index = 0;
     const tick = () => {
@@ -625,6 +659,7 @@ export function PricingCalculator({
             name: partial,
             records,
             description: done ? description : "",
+            diagram: done ? diagram : "",
             bubbleColor: done
               ? row.bubbleColor
                 ? row.bubbleColor
@@ -679,12 +714,15 @@ export function PricingCalculator({
               const payload = (await response.json()) as {
                 name?: unknown;
                 description?: unknown;
+                diagram?: unknown;
               };
               if (
                 typeof payload.name !== "string" ||
                 payload.name.trim() === "" ||
                 typeof payload.description !== "string" ||
-                payload.description.trim() === ""
+                payload.description.trim() === "" ||
+                typeof payload.diagram !== "string" ||
+                payload.diagram.trim() === ""
               ) {
                 requestedProjectNames.current.delete(requestKey);
                 clearGenerating(kind, rowId);
@@ -698,6 +736,7 @@ export function PricingCalculator({
                 rowId,
                 payload.name.trim(),
                 payload.description.trim(),
+                payload.diagram.trim(),
               );
             })
             .catch(() => {
@@ -1056,15 +1095,11 @@ export function PricingCalculator({
                       ) : null}
                     </div>
                     {project.description ? (
-                      <p
-                        className={`relative ml-1 mt-2.5 w-fit max-w-full rounded-2xl px-3 py-2 text-sm animate-in fade-in slide-in-from-bottom-2 duration-500 ${project.bubbleColor}`}
-                      >
-                        <span
-                          aria-hidden
-                          className="absolute -top-2.5 left-4 h-3.5 w-5 bg-inherit [clip-path:path('M_0_14_L_9_1.5_Q_10_0_11_1.5_L_20_14_Z')]"
-                        />
-                        “{project.description}”
-                      </p>
+                      <GeneratedReply
+                        description={project.description}
+                        diagram={project.diagram}
+                        bubbleColor={project.bubbleColor}
+                      />
                     ) : null}
                   </div>
                   <div className="flex items-end gap-3">
@@ -1138,15 +1173,11 @@ export function PricingCalculator({
                       ) : null}
                     </div>
                     {automation.description ? (
-                      <p
-                        className={`relative ml-1 mt-2.5 w-fit max-w-full rounded-2xl px-3 py-2 text-sm animate-in fade-in slide-in-from-bottom-2 duration-500 ${automation.bubbleColor}`}
-                      >
-                        <span
-                          aria-hidden
-                          className="absolute -top-2.5 left-4 h-3.5 w-5 bg-inherit [clip-path:path('M_0_14_L_9_1.5_Q_10_0_11_1.5_L_20_14_Z')]"
-                        />
-                        “{automation.description}”
-                      </p>
+                      <GeneratedReply
+                        description={automation.description}
+                        diagram={automation.diagram}
+                        bubbleColor={automation.bubbleColor}
+                      />
                     ) : null}
                   </div>
                   <div className="flex items-end gap-3">
