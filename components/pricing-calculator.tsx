@@ -31,6 +31,10 @@ type NamedRow = {
   linkedProjectId?: string;
   generatedName?: string;
   generatedRecords?: string;
+  generatedAutomationFor?: string;
+  linkedAutomationId?: string;
+  generatedAutomationName?: string;
+  generatedAutomationRecords?: string;
   description?: string;
   bubbleColor?: string;
   generating?: boolean;
@@ -68,6 +72,15 @@ const starterSources: NamedRow[] = [
 
 const starterProjects: NamedRow[] = [
   { id: "project-1", name: "", placeholder: "Project name", records: "" },
+];
+
+const starterAutomations: NamedRow[] = [
+  {
+    id: "automation-1",
+    name: "",
+    placeholder: "Automation name",
+    records: "",
+  },
 ];
 
 const bubbleColors = [
@@ -204,13 +217,13 @@ const sourceSelectStyles: StylesConfig<SourceOption, false> = {
   }),
 };
 
-function GeneratingHint() {
+function GeneratingHint({ label }: { label: string }) {
   return (
     <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center gap-1.5 text-sm">
       <span className="ai-spark" aria-hidden>
         ✦
       </span>
-      <span className="ai-shimmer-text">Dreaming up a project</span>
+      <span className="ai-shimmer-text">{label}</span>
       <span className="ai-dots" aria-hidden>
         <span />
         <span />
@@ -242,14 +255,18 @@ function RecordsField({
   id,
   value,
   onChange,
+  label = "Records",
+  unitHint = "Pricing is per million records",
 }: {
   id: string;
   value: string;
   onChange: (value: string) => void;
+  label?: string;
+  unitHint?: string;
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <Label htmlFor={id}>Records</Label>
+      <Label htmlFor={id}>{label}</Label>
       <div className="relative w-32">
         <Input
           id={id}
@@ -270,7 +287,7 @@ function RecordsField({
           >
             Million
           </TooltipTrigger>
-          <TooltipContent>Pricing is per million records</TooltipContent>
+          <TooltipContent>{unitHint}</TooltipContent>
         </Tooltip>
       </div>
     </div>
@@ -318,6 +335,18 @@ function savedRow(row: NamedRow): SavedRow {
   if (row.generatedRecords) {
     saved.generatedRecords = row.generatedRecords;
   }
+  if (row.generatedAutomationFor) {
+    saved.generatedAutomationFor = row.generatedAutomationFor;
+  }
+  if (row.linkedAutomationId) {
+    saved.linkedAutomationId = row.linkedAutomationId;
+  }
+  if (row.generatedAutomationName) {
+    saved.generatedAutomationName = row.generatedAutomationName;
+  }
+  if (row.generatedAutomationRecords) {
+    saved.generatedAutomationRecords = row.generatedAutomationRecords;
+  }
   if (row.description) {
     saved.description = row.description;
   }
@@ -330,22 +359,28 @@ function savedRow(row: NamedRow): SavedRow {
 function toSavedForm(
   sources: NamedRow[],
   projects: NamedRow[],
+  automations: NamedRow[],
   nextSourceId: number,
   nextProjectId: number,
+  nextAutomationId: number,
 ): SavedForm {
   return {
     sources: sources.map(savedRow),
     projects: projects.map(savedRow),
+    automations: automations.map(savedRow),
     nextSourceId,
     nextProjectId,
+    nextAutomationId,
   };
 }
 
 const starterForm = toSavedForm(
   starterSources,
   starterProjects,
+  starterAutomations,
   starterSources.length + 1,
   starterProjects.length + 1,
+  starterAutomations.length + 1,
 );
 
 function sameForm(left: SavedForm, right: SavedForm) {
@@ -380,14 +415,25 @@ export function PricingCalculator({
   const [nextProjectId, setNextProjectId] = useState(
     initialForm ? initialForm.nextProjectId : starterProjects.length + 1,
   );
+  const [automations, setAutomations] = useState<NamedRow[]>(
+    initialForm ? initialForm.automations : starterAutomations,
+  );
+  const [nextAutomationId, setNextAutomationId] = useState(
+    initialForm
+      ? initialForm.nextAutomationId
+      : starterAutomations.length + 1,
+  );
   const sourcesRef = useRef(sources);
   const projectsRef = useRef(projects);
+  const automationsRef = useRef(automations);
   const nextProjectIdRef = useRef(nextProjectId);
+  const nextAutomationIdRef = useRef(nextAutomationId);
   const quoteIdRef = useRef(quoteId ? quoteId : "");
   const latestForm = useRef<SavedForm | null>(null);
   const saveTimer = useRef<number | null>(null);
   const pendingWrite = useRef<Promise<void> | null>(null);
   const hydrating = useRef(true);
+  const focusNameId = useRef<string | null>(null);
   const requestedProjectNames = useRef(new Set<string>());
   const [apps, setApps] = useState<KnownApp[]>([]);
   const sourceOptions = useMemo<SourceOption[]>(
@@ -423,85 +469,123 @@ export function PricingCalculator({
     };
   }, []);
 
-  function clearGenerating(projectId: string) {
-    setProjects((current) => {
-      const next = current.map((project) =>
-        project.id === projectId ? { ...project, generating: false } : project,
+  type GeneratedKind = "project" | "automation";
+
+  function bucket(kind: GeneratedKind) {
+    if (kind === "project") {
+      return {
+        rowsRef: projectsRef,
+        setRows: setProjects,
+        nextIdRef: nextProjectIdRef,
+        setNextId: setNextProjectId,
+        placeholder: "Project name",
+        idPrefix: "project",
+        generatedFor: "generatedFor" as const,
+        linkedId: "linkedProjectId" as const,
+        generatedName: "generatedName" as const,
+        generatedRecords: "generatedRecords" as const,
+      };
+    }
+
+    return {
+      rowsRef: automationsRef,
+      setRows: setAutomations,
+      nextIdRef: nextAutomationIdRef,
+      setNextId: setNextAutomationId,
+      placeholder: "Automation name",
+      idPrefix: "automation",
+      generatedFor: "generatedAutomationFor" as const,
+      linkedId: "linkedAutomationId" as const,
+      generatedName: "generatedAutomationName" as const,
+      generatedRecords: "generatedAutomationRecords" as const,
+    };
+  }
+
+  function clearGenerating(kind: GeneratedKind, rowId: string) {
+    const { rowsRef, setRows } = bucket(kind);
+    setRows((current) => {
+      const next = current.map((row) =>
+        row.id === rowId ? { ...row, generating: false } : row,
       );
-      projectsRef.current = next;
+      rowsRef.current = next;
       return next;
     });
   }
 
-  function reserveGeneratingProject(source: NamedRow) {
-    const current = projectsRef.current;
-    const linked = source.linkedProjectId
-      ? current.find((project) => project.id === source.linkedProjectId)
+  function reserveGenerating(kind: GeneratedKind, source: NamedRow) {
+    const fields = bucket(kind);
+    const current = fields.rowsRef.current;
+    const linkedId = source[fields.linkedId];
+    const linked = linkedId
+      ? current.find((row) => row.id === linkedId)
       : undefined;
+    const generatedName = source[fields.generatedName];
+    const generatedRecords = source[fields.generatedRecords];
     const userEdited =
       linked !== undefined &&
       !linked.revealing &&
-      source.generatedName !== undefined &&
-      (linked.name !== source.generatedName ||
-        linked.records !== source.generatedRecords);
+      generatedName !== undefined &&
+      (linked.name !== generatedName || linked.records !== generatedRecords);
 
     if (linked && !userEdited) {
-      const next = current.map((project) =>
-        project.id === linked.id
+      const next = current.map((row) =>
+        row.id === linked.id
           ? {
-              ...project,
+              ...row,
               name: "",
               description: "",
               records: "",
               generating: true,
             }
-          : project,
+          : row,
       );
-      projectsRef.current = next;
-      setProjects(next);
+      fields.rowsRef.current = next;
+      fields.setRows(next);
       return linked.id;
     }
 
     const open = current.find(
-      (project) => project.name.trim() === "" && !project.generating,
+      (row) => row.name.trim() === "" && !row.generating,
     );
     if (open) {
-      const next = current.map((project) =>
-        project.id === open.id ? { ...project, generating: true } : project,
+      const next = current.map((row) =>
+        row.id === open.id ? { ...row, generating: true } : row,
       );
-      projectsRef.current = next;
-      setProjects(next);
+      fields.rowsRef.current = next;
+      fields.setRows(next);
       return open.id;
     }
 
-    const id = `project-${nextProjectIdRef.current}`;
-    nextProjectIdRef.current += 1;
-    setNextProjectId(nextProjectIdRef.current);
+    const id = `${fields.idPrefix}-${fields.nextIdRef.current}`;
+    fields.nextIdRef.current += 1;
+    fields.setNextId(fields.nextIdRef.current);
     const next = [
       ...current,
       {
         id,
         name: "",
-        placeholder: "Project name",
+        placeholder: fields.placeholder,
         records: "",
         generating: true,
       },
     ];
-    projectsRef.current = next;
-    setProjects(next);
+    fields.rowsRef.current = next;
+    fields.setRows(next);
     return id;
   }
 
-  function revealProject(
+  function revealGenerated(
+    kind: GeneratedKind,
     sourceId: string,
     sourceName: string,
-    projectId: string,
-    projectName: string,
+    rowId: string,
+    rowName: string,
     description: string,
   ) {
+    const fields = bucket(kind);
     const source = sourcesRef.current.find((item) => item.id === sourceId);
     if (!source || source.name.trim() !== sourceName) {
-      clearGenerating(projectId);
+      clearGenerating(kind, rowId);
       return;
     }
 
@@ -514,10 +598,10 @@ export function PricingCalculator({
 
       return {
         ...item,
-        generatedFor: sourceName,
-        linkedProjectId: projectId,
-        generatedName: projectName,
-        generatedRecords: records,
+        [fields.generatedFor]: sourceName,
+        [fields.linkedId]: rowId,
+        [fields.generatedName]: rowName,
+        [fields.generatedRecords]: records,
       };
     });
     sourcesRef.current = nextSources;
@@ -526,29 +610,29 @@ export function PricingCalculator({
     let index = 0;
     const tick = () => {
       index += 1;
-      const partial = projectName.slice(0, index);
-      const done = index >= projectName.length;
-      setProjects((current) => {
-        const next = current.map((project) => {
-          if (project.id !== projectId) {
-            return project;
+      const partial = rowName.slice(0, index);
+      const done = index >= rowName.length;
+      fields.setRows((current) => {
+        const next = current.map((row) => {
+          if (row.id !== rowId) {
+            return row;
           }
 
           return {
-            ...project,
+            ...row,
             generating: false,
             revealing: !done,
             name: partial,
             records,
             description: done ? description : "",
             bubbleColor: done
-              ? project.bubbleColor
-                ? project.bubbleColor
+              ? row.bubbleColor
+                ? row.bubbleColor
                 : randomBubbleColor()
-              : project.bubbleColor,
+              : row.bubbleColor,
           };
         });
-        projectsRef.current = next;
+        fields.rowsRef.current = next;
         return next;
       });
       if (!done) {
@@ -559,63 +643,69 @@ export function PricingCalculator({
   }
 
   useEffect(() => {
+    const kinds: GeneratedKind[] = ["project", "automation"];
     for (const source of sources) {
       const sourceName = source.name.trim();
       if (sourceName === "" || !hasRealRecordCount(source.records)) {
         continue;
       }
-      if (source.generatedFor === sourceName) {
-        continue;
-      }
 
-      const requestKey = `${source.id}:${sourceName}`;
-      if (requestedProjectNames.current.has(requestKey)) {
-        continue;
-      }
-      requestedProjectNames.current.add(requestKey);
-      queueMicrotask(() => {
-        const projectId = reserveGeneratingProject(source);
+      for (const kind of kinds) {
+        const fields = bucket(kind);
+        if (source[fields.generatedFor] === sourceName) {
+          continue;
+        }
 
-        void fetch("/api/project-name", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sourceName }),
-        })
-          .then(async (response) => {
-            if (!response.ok) {
-              requestedProjectNames.current.delete(requestKey);
-              clearGenerating(projectId);
-              return;
-            }
+        const requestKey = `${kind}:${source.id}:${sourceName}`;
+        if (requestedProjectNames.current.has(requestKey)) {
+          continue;
+        }
+        requestedProjectNames.current.add(requestKey);
+        queueMicrotask(() => {
+          const rowId = reserveGenerating(kind, source);
 
-            const payload = (await response.json()) as {
-              name?: unknown;
-              description?: unknown;
-            };
-            if (
-              typeof payload.name !== "string" ||
-              payload.name.trim() === "" ||
-              typeof payload.description !== "string" ||
-              payload.description.trim() === ""
-            ) {
-              requestedProjectNames.current.delete(requestKey);
-              clearGenerating(projectId);
-              return;
-            }
-
-            revealProject(
-              source.id,
-              sourceName,
-              projectId,
-              payload.name.trim(),
-              payload.description.trim(),
-            );
+          void fetch("/api/project-name", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sourceName, kind }),
           })
-          .catch(() => {
-            requestedProjectNames.current.delete(requestKey);
-            clearGenerating(projectId);
-          });
-      });
+            .then(async (response) => {
+              if (!response.ok) {
+                requestedProjectNames.current.delete(requestKey);
+                clearGenerating(kind, rowId);
+                return;
+              }
+
+              const payload = (await response.json()) as {
+                name?: unknown;
+                description?: unknown;
+              };
+              if (
+                typeof payload.name !== "string" ||
+                payload.name.trim() === "" ||
+                typeof payload.description !== "string" ||
+                payload.description.trim() === ""
+              ) {
+                requestedProjectNames.current.delete(requestKey);
+                clearGenerating(kind, rowId);
+                return;
+              }
+
+              revealGenerated(
+                kind,
+                source.id,
+                sourceName,
+                rowId,
+                payload.name.trim(),
+                payload.description.trim(),
+              );
+            })
+            .catch(() => {
+              requestedProjectNames.current.delete(requestKey);
+              clearGenerating(kind, rowId);
+            });
+        });
+      }
     }
   }, [sources]);
 
@@ -628,10 +718,21 @@ export function PricingCalculator({
       name: project.name,
       recordsInMillions: parseCount(project.records),
     })),
+    automations: automations.map((automation) => ({
+      name: automation.name,
+      recordsInMillions: parseCount(automation.records),
+    })),
   });
 
   useEffect(() => {
-    const form = toSavedForm(sources, projects, nextSourceId, nextProjectId);
+    const form = toSavedForm(
+      sources,
+      projects,
+      automations,
+      nextSourceId,
+      nextProjectId,
+      nextAutomationId,
+    );
     latestForm.current = form;
     if (saveTimer.current !== null) {
       window.clearTimeout(saveTimer.current);
@@ -712,7 +813,7 @@ export function PricingCalculator({
         window.clearTimeout(saveTimer.current);
       }
     };
-  }, [sources, projects, nextSourceId, nextProjectId]);
+  }, [sources, projects, automations, nextSourceId, nextProjectId, nextAutomationId]);
 
   function updateSource(
     id: string,
@@ -739,8 +840,18 @@ export function PricingCalculator({
     });
   }
 
+  useEffect(() => {
+    const id = focusNameId.current;
+    if (!id) {
+      return;
+    }
+    focusNameId.current = null;
+    document.getElementById(id)?.focus();
+  }, [sources, projects, automations]);
+
   function addSource() {
     const id = `source-${nextSourceId}`;
+    focusNameId.current = `${id}-name`;
     setNextSourceId(nextSourceId + 1);
     setSources((current) => {
       const next = [
@@ -779,6 +890,7 @@ export function PricingCalculator({
 
   function addProject() {
     const id = `project-${nextProjectIdRef.current}`;
+    focusNameId.current = `${id}-name`;
     nextProjectIdRef.current += 1;
     setNextProjectId(nextProjectIdRef.current);
     setProjects((current) => {
@@ -787,6 +899,46 @@ export function PricingCalculator({
         { id, name: "", placeholder: "Project name", records: "" },
       ];
       projectsRef.current = next;
+      return next;
+    });
+  }
+
+  function updateAutomation(
+    id: string,
+    patch: Partial<Pick<NamedRow, "name" | "records">>,
+  ) {
+    setAutomations((current) => {
+      const next = current.map((automation) =>
+        automation.id === id ? { ...automation, ...patch } : automation,
+      );
+      automationsRef.current = next;
+      return next;
+    });
+  }
+
+  function removeAutomation(id: string) {
+    setAutomations((current) => {
+      if (current.length <= 1) {
+        return current;
+      }
+
+      const next = current.filter((automation) => automation.id !== id);
+      automationsRef.current = next;
+      return next;
+    });
+  }
+
+  function addAutomation() {
+    const id = `automation-${nextAutomationIdRef.current}`;
+    focusNameId.current = `${id}-name`;
+    nextAutomationIdRef.current += 1;
+    setNextAutomationId(nextAutomationIdRef.current);
+    setAutomations((current) => {
+      const next = [
+        ...current,
+        { id, name: "", placeholder: "Automation name", records: "" },
+      ];
+      automationsRef.current = next;
       return next;
     });
   }
@@ -899,7 +1051,9 @@ export function PricingCalculator({
                           });
                         }}
                       />
-                      {project.generating ? <GeneratingHint /> : null}
+                      {project.generating ? (
+                        <GeneratingHint label="Dreaming up a project" />
+                      ) : null}
                     </div>
                     {project.description ? (
                       <p
@@ -944,12 +1098,97 @@ export function PricingCalculator({
             </Button>
           </div>
         </fieldset>
+
+        <fieldset className="flex flex-col gap-4">
+          <legend className="text-sm font-medium">Automations</legend>
+          <p className="text-sm text-muted-foreground">
+            $500 per million rows, separate from sources and projects.
+          </p>
+          <div className="flex flex-col gap-3">
+            {automations.map((automation) => {
+              const nameId = `${automation.id}-name`;
+              const recordsId = `${automation.id}-records`;
+
+              return (
+                <div
+                  key={automation.id}
+                  className="grid gap-3 rounded-xl border bg-card p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start"
+                >
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor={nameId}>Automation</Label>
+                    <div className="relative">
+                      <Input
+                        id={nameId}
+                        value={automation.name}
+                        placeholder={
+                          automation.generating ? "" : automation.placeholder
+                        }
+                        readOnly={
+                          automation.generating || automation.revealing
+                        }
+                        aria-busy={automation.generating}
+                        onChange={(event) => {
+                          updateAutomation(automation.id, {
+                            name: event.target.value,
+                          });
+                        }}
+                      />
+                      {automation.generating ? (
+                        <GeneratingHint label="Dreaming up an automation" />
+                      ) : null}
+                    </div>
+                    {automation.description ? (
+                      <p
+                        className={`relative ml-1 mt-2.5 w-fit max-w-full rounded-2xl px-3 py-2 text-sm animate-in fade-in slide-in-from-bottom-2 duration-500 ${automation.bubbleColor}`}
+                      >
+                        <span
+                          aria-hidden
+                          className="absolute -top-2.5 left-4 h-3.5 w-5 bg-inherit [clip-path:path('M_0_14_L_9_1.5_Q_10_0_11_1.5_L_20_14_Z')]"
+                        />
+                        “{automation.description}”
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex items-end gap-3">
+                    <RecordsField
+                      id={recordsId}
+                      value={automation.records}
+                      onChange={(records) => {
+                        updateAutomation(automation.id, { records });
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Remove ${automation.name || automation.placeholder || "automation"}`}
+                      disabled={automations.length <= 1}
+                      onClick={() => {
+                        removeAutomation(automation.id);
+                      }}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div>
+            <Button type="button" variant="outline" onClick={addAutomation}>
+              Add automation
+            </Button>
+          </div>
+        </fieldset>
       </form>
 
       <Card className="lg:sticky lg:top-6">
         <CardHeader>
           <CardTitle>Estimate</CardTitle>
-          <CardDescription>$50 per million records each month.</CardDescription>
+          <CardDescription>
+            Sources and projects are $50 per million. Automations are $500 per
+            million rows.
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <dl className="flex flex-col gap-4">
@@ -978,6 +1217,20 @@ export function PricingCalculator({
                 </span>
                 <span className="block text-muted-foreground tabular-nums">
                   {moneyFormat.format(estimate.projectAmount)}
+                </span>
+              </dd>
+            </div>
+            <div className="flex items-start justify-between gap-4">
+              <EstimateHint
+                label="Automations"
+                hint="Billed at $500 per million rows, separate from sources and projects."
+              />
+              <dd className="text-right">
+                <span className="block font-medium tabular-nums">
+                  {countFormat.format(estimate.automationRecords)}
+                </span>
+                <span className="block text-muted-foreground tabular-nums">
+                  {moneyFormat.format(estimate.automationAmount)}
                 </span>
               </dd>
             </div>

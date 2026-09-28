@@ -17,10 +17,19 @@ export async function POST(request: Request) {
   }
 
   let sourceName = ""
+  let kind = "project"
   try {
-    const body = (await request.json()) as { sourceName?: unknown }
+    const body = (await request.json()) as {
+      sourceName?: unknown
+      kind?: unknown
+    }
     if (typeof body.sourceName === "string") {
       sourceName = body.sourceName.trim()
+    }
+    if (body.kind === "automation") {
+      kind = "automation"
+    } else if (body.kind !== undefined && body.kind !== "project") {
+      return Response.json({ error: "Invalid kind" }, { status: 400 })
     }
   } catch {
     return Response.json({ error: "Invalid request" }, { status: 400 })
@@ -30,13 +39,18 @@ export async function POST(request: Request) {
     return Response.json({ error: "Source name is required" }, { status: 400 })
   }
 
+  const prompt =
+    kind === "automation"
+      ? `Suggest one short automation name a customer would run from ${sourceName} data. Write the description as a short request the customer would type, in the style of "Notify me when a deal stalls" or "Post closed revenue to the channel". Do not describe the product, and do not start every description with "Notify me".`
+      : `Suggest one short project name a customer would build from ${sourceName} data. Write the description as a short request the customer would type, in the style of "Show me pipeline health by rep" or "Compare revenue to closed deals". Do not describe the product, and do not start every description with "Show me".`
+
   try {
     const client = new OpenAI({ apiKey })
     const response = await client.responses.create({
       model: "gpt-6-luna",
       service_tier: "fast",
       reasoning: { effort: "none" },
-      input: `Suggest one short project name a customer would build from ${sourceName} data. Write the description as a short request the customer would type, in the style of "Show me pipeline health by rep" or "Compare revenue to closed deals". Do not describe the product, and do not start every description with "Show me".`,
+      input: prompt,
       text: {
         format: {
           type: "json_schema",

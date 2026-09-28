@@ -1,6 +1,7 @@
 const recordsPerMillion = 1_000_000
 
 export const pricePerMillion = 50
+export const automationPricePerMillion = 500
 export const daysInMonth = 30
 
 export type UsageRow = {
@@ -38,16 +39,20 @@ export type PricedQuote = {
   sourceAmount: number
   projectRecords: number
   projectAmount: number
+  automations: PricedRow[]
+  automationRecords: number
+  automationAmount: number
+  automationPricePerMillion: number
   monthlyTotal: number
 }
 
-function priceForRecords(records: number) {
-  return (records / recordsPerMillion) * pricePerMillion
+function priceForRecords(records: number, rate: number) {
+  return (records / recordsPerMillion) * rate
 }
 
 export function quote(input: QuoteInput): Quote {
-  const sourceAmount = priceForRecords(input.totalRecords)
-  const projectAmount = priceForRecords(input.projectRecords)
+  const sourceAmount = priceForRecords(input.totalRecords, pricePerMillion)
+  const projectAmount = priceForRecords(input.projectRecords, pricePerMillion)
 
   return {
     totalRecords: input.totalRecords,
@@ -58,7 +63,11 @@ export function quote(input: QuoteInput): Quote {
   }
 }
 
-function priceRows(rows: UsageRow[], dayMultiplier: number): PricedRow[] {
+function priceRows(
+  rows: UsageRow[],
+  dayMultiplier: number,
+  rate: number,
+): PricedRow[] {
   return rows.map((row) => {
     const records = row.recordsInMillions * recordsPerMillion * dayMultiplier
 
@@ -66,7 +75,7 @@ function priceRows(rows: UsageRow[], dayMultiplier: number): PricedRow[] {
       name: row.name,
       recordsInMillions: row.recordsInMillions,
       records,
-      amount: priceForRecords(records),
+      amount: priceForRecords(records, rate),
     }
   })
 }
@@ -74,23 +83,31 @@ function priceRows(rows: UsageRow[], dayMultiplier: number): PricedRow[] {
 export function priceUsage(input: {
   sources: UsageRow[]
   projects: UsageRow[]
+  automations: UsageRow[]
 }): PricedQuote {
-  const sources = priceRows(input.sources, 1)
-  const projects = priceRows(input.projects, daysInMonth)
+  const sources = priceRows(input.sources, 1, pricePerMillion)
+  const projects = priceRows(input.projects, daysInMonth, pricePerMillion)
+  const automations = priceRows(input.automations, 1, automationPricePerMillion)
   const sourceRecords = sources.reduce((sum, row) => sum + row.records, 0)
   const projectRecords = projects.reduce((sum, row) => sum + row.records, 0)
+  const automationRecords = automations.reduce((sum, row) => sum + row.records, 0)
   const priced = quote({ totalRecords: sourceRecords, projectRecords })
+  const automationAmount = automations.reduce((sum, row) => sum + row.amount, 0)
 
   return {
     currency: "USD",
     pricePerMillion,
+    automationPricePerMillion,
     daysInMonth,
     sources,
     projects,
+    automations,
     sourceRecords: priced.totalRecords,
     sourceAmount: priced.sourceAmount,
     projectRecords: priced.projectRecords,
     projectAmount: priced.projectAmount,
-    monthlyTotal: priced.monthlyTotal,
+    automationRecords,
+    automationAmount,
+    monthlyTotal: priced.monthlyTotal + automationAmount,
   }
 }

@@ -43,9 +43,13 @@ function readRows(value: unknown, label: string): UsageRow[] | string {
 }
 
 export async function POST(request: Request) {
-  let body: { sources?: unknown; projects?: unknown }
+  let body: { sources?: unknown; projects?: unknown; automations?: unknown }
   try {
-    body = (await request.json()) as { sources?: unknown; projects?: unknown }
+    body = (await request.json()) as {
+      sources?: unknown
+      projects?: unknown
+      automations?: unknown
+    }
   } catch {
     return Response.json({ error: "Invalid request" }, { status: 400 })
   }
@@ -58,6 +62,10 @@ export async function POST(request: Request) {
   if (typeof projects === "string") {
     return Response.json({ error: projects }, { status: 400 })
   }
+  const automations = readRows(body.automations, "Automations")
+  if (typeof automations === "string") {
+    return Response.json({ error: automations }, { status: 400 })
+  }
 
-  return Response.json(priceUsage({ sources, projects }))
+  return Response.json(priceUsage({ sources, projects, automations }))
 }

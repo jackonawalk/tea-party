@@ -15,8 +15,8 @@ export function CalculatorScreen({
           Pricing calculator
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Enter records for each data source, then name each project and
-          estimate its records.
+          Enter records for each data source, name each project, and name each
+          automation.
         </p>
       </header>
       <PricingCalculator quoteId={quoteId} initialForm={initialForm} />

@@ -7,6 +7,10 @@ export type SavedRow = {
   linkedProjectId?: string
   generatedName?: string
   generatedRecords?: string
+  generatedAutomationFor?: string
+  linkedAutomationId?: string
+  generatedAutomationName?: string
+  generatedAutomationRecords?: string
   description?: string
   bubbleColor?: string
 }
@@ -14,8 +18,10 @@ export type SavedRow = {
 export type SavedForm = {
   sources: SavedRow[]
   projects: SavedRow[]
+  automations: SavedRow[]
   nextSourceId: number
   nextProjectId: number
+  nextAutomationId: number
 }
 
 const optionalKeys = [
@@ -23,6 +29,10 @@ const optionalKeys = [
   "linkedProjectId",
   "generatedName",
   "generatedRecords",
+  "generatedAutomationFor",
+  "linkedAutomationId",
+  "generatedAutomationName",
+  "generatedAutomationRecords",
   "description",
   "bubbleColor",
 ] as const
@@ -106,5 +116,36 @@ export function parseSavedForm(value: unknown): SavedForm | null {
     return null
   }
 
-  return { sources, projects, nextSourceId, nextProjectId }
+  let automations = [
+    {
+      id: "automation-1",
+      name: "",
+      placeholder: "Automation name",
+      records: "",
+    },
+  ]
+  let nextAutomationId = 2
+  if (value.automations !== undefined) {
+    const parsed = readRows(value.automations)
+    if (!parsed) {
+      return null
+    }
+    automations = parsed
+  }
+  if (value.nextAutomationId !== undefined) {
+    const parsed = readCount(value.nextAutomationId)
+    if (parsed === null) {
+      return null
+    }
+    nextAutomationId = parsed
+  }
+
+  return {
+    sources,
+    projects,
+    automations,
+    nextSourceId,
+    nextProjectId,
+    nextAutomationId,
+  }
 }
