@@ -13,10 +13,14 @@ export type SavedRow = {
   generatedAutomationRecords?: string
   description?: string
   diagram?: string
+  diagramHidden?: boolean
   bubbleColor?: string
 }
 
+export const defaultQuoteTitle = "Pricing calculator"
+
 export type SavedForm = {
+  title: string
   sources: SavedRow[]
   projects: SavedRow[]
   automations: SavedRow[]
@@ -83,6 +87,15 @@ function readRow(value: unknown): SavedRow | null {
     }
     if (field !== "") {
       row[key] = field
+    }
+  }
+
+  if (value.diagramHidden !== undefined) {
+    if (typeof value.diagramHidden !== "boolean") {
+      return null
+    }
+    if (value.diagramHidden) {
+      row.diagramHidden = true
     }
   }
 
@@ -165,7 +178,16 @@ export function parseSavedForm(value: unknown): SavedForm | null {
     whiteGlove = value.whiteGlove
   }
 
+  let title = defaultQuoteTitle
+  if (value.title !== undefined) {
+    if (typeof value.title !== "string") {
+      return null
+    }
+    title = value.title.slice(0, 200)
+  }
+
   return {
+    title,
     sources,
     projects,
     automations,

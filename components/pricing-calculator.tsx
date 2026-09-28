@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Info, Trash2 } from "lucide-react";
+import { Eye, EyeOff, Info, Trash2 } from "lucide-react";
 import CreatableSelect from "react-select/creatable";
 import type { StylesConfig } from "react-select";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { priceUsage } from "@/lib/pricing";
-import type { SavedForm, SavedRow } from "@/lib/saved-form";
+import {
+  defaultQuoteTitle,
+  type SavedForm,
+  type SavedRow,
+} from "@/lib/saved-form";
 import { MermaidDiagram } from "@/components/mermaid-diagram";
 
 type NamedRow = {
@@ -38,6 +42,7 @@ type NamedRow = {
   generatedAutomationRecords?: string;
   description?: string;
   diagram?: string;
+  diagramHidden?: boolean;
   diagramGenerating?: boolean;
   bubbleColor?: string;
   generating?: boolean;
@@ -256,6 +261,50 @@ function GeneratingHint({ label }: { label: string }) {
   );
 }
 
+function DiagramBlock({
+  diagram,
+  generating,
+  hidden,
+  onHiddenChange,
+}: {
+  diagram?: string;
+  generating?: boolean;
+  hidden?: boolean;
+  onHiddenChange: (hidden: boolean) => void;
+}) {
+  if (!diagram && !generating) {
+    return null;
+  }
+
+  return (
+    <div className="col-span-full flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-3">
+        {generating ? (
+          <p className="text-sm text-muted-foreground">Updating diagram</p>
+        ) : null}
+        {diagram ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="ml-auto"
+            aria-pressed={hidden === true}
+            onClick={() => {
+              onHiddenChange(hidden !== true);
+            }}
+          >
+            {hidden ? <EyeOff /> : <Eye />}
+            <span className="sr-only">
+              {hidden ? "Show diagram" : "Hide diagram"}
+            </span>
+          </Button>
+        ) : null}
+      </div>
+      {diagram && hidden !== true ? <MermaidDiagram chart={diagram} /> : null}
+    </div>
+  );
+}
+
 function EstimateHint({ label, hint }: { label: string; hint: string }) {
   return (
     <dt className="flex items-center gap-1 text-muted-foreground">
@@ -376,6 +425,9 @@ function savedRow(row: NamedRow): SavedRow {
   if (row.diagram) {
     saved.diagram = row.diagram;
   }
+  if (row.diagramHidden) {
+    saved.diagramHidden = true;
+  }
   if (row.bubbleColor) {
     saved.bubbleColor = row.bubbleColor;
   }
@@ -383,6 +435,7 @@ function savedRow(row: NamedRow): SavedRow {
 }
 
 function toSavedForm(
+  title: string,
   sources: NamedRow[],
   projects: NamedRow[],
   automations: NamedRow[],
@@ -392,6 +445,7 @@ function toSavedForm(
   whiteGlove: boolean,
 ): SavedForm {
   return {
+    title,
     sources: sources.map(savedRow),
     projects: projects.map(savedRow),
     automations: automations.map(savedRow),
@@ -403,6 +457,7 @@ function toSavedForm(
 }
 
 const starterForm = toSavedForm(
+  defaultQuoteTitle,
   starterSources,
   starterProjects,
   starterAutomations,
@@ -428,9 +483,11 @@ function fifthOfRecords(records: string) {
 export function PricingCalculator({
   quoteId,
   initialForm,
+  title,
 }: {
   quoteId?: string;
   initialForm?: SavedForm;
+  title: string;
 }) {
   const [sources, setSources] = useState<NamedRow[]>(
     initialForm ? initialForm.sources : starterSources,
@@ -768,6 +825,7 @@ export function PricingCalculator({
 
   useEffect(() => {
     const form = toSavedForm(
+      title,
       sources,
       projects,
       automations,
@@ -864,6 +922,7 @@ export function PricingCalculator({
     nextProjectId,
     nextAutomationId,
     whiteGlove,
+    title,
   ]);
 
   function updateSource(
@@ -1032,7 +1091,7 @@ export function PricingCalculator({
 
   function updateProject(
     id: string,
-    patch: Partial<Pick<NamedRow, "name" | "records">>,
+    patch: Partial<Pick<NamedRow, "name" | "records" | "diagramHidden">>,
   ) {
     setProjects((current) => {
       const next = current.map((project) =>
@@ -1091,7 +1150,7 @@ export function PricingCalculator({
 
   function updateAutomation(
     id: string,
-    patch: Partial<Pick<NamedRow, "name" | "records">>,
+    patch: Partial<Pick<NamedRow, "name" | "records" | "diagramHidden">>,
   ) {
     setAutomations((current) => {
       const next = current.map((automation) =>
@@ -1286,18 +1345,14 @@ export function PricingCalculator({
                       <Trash2 />
                     </Button>
                   </div>
-                  {project.diagram || project.diagramGenerating ? (
-                    <div className="col-span-full">
-                      {project.diagramGenerating ? (
-                        <p className="mb-2 text-sm text-muted-foreground">
-                          Updating diagram
-                        </p>
-                      ) : null}
-                      {project.diagram ? (
-                        <MermaidDiagram chart={project.diagram} />
-                      ) : null}
-                    </div>
-                  ) : null}
+                  <DiagramBlock
+                    diagram={project.diagram}
+                    generating={project.diagramGenerating}
+                    hidden={project.diagramHidden}
+                    onHiddenChange={(diagramHidden) => {
+                      updateProject(project.id, { diagramHidden });
+                    }}
+                  />
                 </div>
               );
             })}
@@ -1369,18 +1424,14 @@ export function PricingCalculator({
                       <Trash2 />
                     </Button>
                   </div>
-                  {automation.diagram || automation.diagramGenerating ? (
-                    <div className="col-span-full">
-                      {automation.diagramGenerating ? (
-                        <p className="mb-2 text-sm text-muted-foreground">
-                          Updating diagram
-                        </p>
-                      ) : null}
-                      {automation.diagram ? (
-                        <MermaidDiagram chart={automation.diagram} />
-                      ) : null}
-                    </div>
-                  ) : null}
+                  <DiagramBlock
+                    diagram={automation.diagram}
+                    generating={automation.diagramGenerating}
+                    hidden={automation.diagramHidden}
+                    onHiddenChange={(diagramHidden) => {
+                      updateAutomation(automation.id, { diagramHidden });
+                    }}
+                  />
                 </div>
               );
             })}
