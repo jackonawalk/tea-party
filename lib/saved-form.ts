@@ -23,6 +23,7 @@ export type SavedForm = {
   nextSourceId: number
   nextProjectId: number
   nextAutomationId: number
+  whiteGlove: boolean
 }
 
 const optionalKeys = [
@@ -142,6 +143,14 @@ export function parseSavedForm(value: unknown): SavedForm | null {
     nextAutomationId = parsed
   }
 
+  let whiteGlove = false
+  if (value.whiteGlove !== undefined) {
+    if (typeof value.whiteGlove !== "boolean") {
+      return null
+    }
+    whiteGlove = value.whiteGlove
+  }
+
   return {
     sources,
     projects,
@@ -149,5 +158,6 @@ export function parseSavedForm(value: unknown): SavedForm | null {
     nextSourceId,
     nextProjectId,
     nextAutomationId,
+    whiteGlove,
   }
 }

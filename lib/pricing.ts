@@ -2,6 +2,7 @@ const recordsPerMillion = 1_000_000
 
 export const pricePerMillion = 50
 export const automationPricePerMillion = 500
+export const whiteGloveRate = 0.2
 export const daysInMonth = 30
 
 export type UsageRow = {
@@ -43,6 +44,9 @@ export type PricedQuote = {
   automationRecords: number
   automationAmount: number
   automationPricePerMillion: number
+  whiteGlove: boolean
+  whiteGloveRate: number
+  whiteGloveAmount: number
   monthlyTotal: number
 }
 
@@ -84,6 +88,7 @@ export function priceUsage(input: {
   sources: UsageRow[]
   projects: UsageRow[]
   automations: UsageRow[]
+  whiteGlove: boolean
 }): PricedQuote {
   const sources = priceRows(input.sources, 1, pricePerMillion)
   const projects = priceRows(input.projects, daysInMonth, pricePerMillion)
@@ -93,6 +98,8 @@ export function priceUsage(input: {
   const automationRecords = automations.reduce((sum, row) => sum + row.records, 0)
   const priced = quote({ totalRecords: sourceRecords, projectRecords })
   const automationAmount = automations.reduce((sum, row) => sum + row.amount, 0)
+  const spend = priced.monthlyTotal + automationAmount
+  const whiteGloveAmount = input.whiteGlove ? spend * whiteGloveRate : 0
 
   return {
     currency: "USD",
@@ -108,6 +115,9 @@ export function priceUsage(input: {
     projectAmount: priced.projectAmount,
     automationRecords,
     automationAmount,
-    monthlyTotal: priced.monthlyTotal + automationAmount,
+    whiteGlove: input.whiteGlove,
+    whiteGloveRate,
+    whiteGloveAmount,
+    monthlyTotal: spend + whiteGloveAmount,
   }
 }

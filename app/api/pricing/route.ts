@@ -43,12 +43,18 @@ function readRows(value: unknown, label: string): UsageRow[] | string {
 }
 
 export async function POST(request: Request) {
-  let body: { sources?: unknown; projects?: unknown; automations?: unknown }
+  let body: {
+    sources?: unknown
+    projects?: unknown
+    automations?: unknown
+    whiteGlove?: unknown
+  }
   try {
     body = (await request.json()) as {
       sources?: unknown
       projects?: unknown
       automations?: unknown
+      whiteGlove?: unknown
     }
   } catch {
     return Response.json({ error: "Invalid request" }, { status: 400 })
@@ -67,5 +73,18 @@ export async function POST(request: Request) {
     return Response.json({ error: automations }, { status: 400 })
   }
 
-  return Response.json(priceUsage({ sources, projects, automations }))
+  let whiteGlove = false
+  if (body.whiteGlove !== undefined) {
+    if (typeof body.whiteGlove !== "boolean") {
+      return Response.json(
+        { error: "White-glove support must be true or false" },
+        { status: 400 },
+      )
+    }
+    whiteGlove = body.whiteGlove
+  }
+
+  return Response.json(
+    priceUsage({ sources, projects, automations, whiteGlove }),
+  )
 }

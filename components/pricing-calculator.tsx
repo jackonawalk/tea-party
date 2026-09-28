@@ -389,6 +389,7 @@ function toSavedForm(
   nextSourceId: number,
   nextProjectId: number,
   nextAutomationId: number,
+  whiteGlove: boolean,
 ): SavedForm {
   return {
     sources: sources.map(savedRow),
@@ -397,6 +398,7 @@ function toSavedForm(
     nextSourceId,
     nextProjectId,
     nextAutomationId,
+    whiteGlove,
   };
 }
 
@@ -407,6 +409,7 @@ const starterForm = toSavedForm(
   starterSources.length + 1,
   starterProjects.length + 1,
   starterAutomations.length + 1,
+  false,
 );
 
 function sameForm(left: SavedForm, right: SavedForm) {
@@ -446,6 +449,9 @@ export function PricingCalculator({
   );
   const [nextAutomationId, setNextAutomationId] = useState(
     initialForm ? initialForm.nextAutomationId : starterAutomations.length + 1,
+  );
+  const [whiteGlove, setWhiteGlove] = useState(
+    initialForm ? initialForm.whiteGlove : false,
   );
   const sourcesRef = useRef(sources);
   const projectsRef = useRef(projects);
@@ -757,6 +763,7 @@ export function PricingCalculator({
       name: automation.name,
       recordsInMillions: parseCount(automation.records),
     })),
+    whiteGlove,
   });
 
   useEffect(() => {
@@ -767,6 +774,7 @@ export function PricingCalculator({
       nextSourceId,
       nextProjectId,
       nextAutomationId,
+      whiteGlove,
     );
     latestForm.current = form;
     if (saveTimer.current !== null) {
@@ -855,6 +863,7 @@ export function PricingCalculator({
     nextSourceId,
     nextProjectId,
     nextAutomationId,
+    whiteGlove,
   ]);
 
   function updateSource(
@@ -1346,10 +1355,6 @@ export function PricingCalculator({
       <Card className="lg:sticky lg:top-6">
         <CardHeader>
           <CardTitle>Estimate</CardTitle>
-          <CardDescription>
-            Sources and projects are $50 per million. Automations are $500 per
-            million rows.
-          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <dl className="flex flex-col gap-4">
@@ -1396,6 +1401,29 @@ export function PricingCalculator({
               </dd>
             </div>
           </dl>
+          <label className="flex items-start justify-between gap-4 border-t pt-4 text-sm">
+            <span className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 accent-foreground"
+                checked={whiteGlove}
+                onChange={(event) => {
+                  setWhiteGlove(event.target.checked);
+                }}
+              />
+              <span>
+                Add white-glove support plan
+                <span className="mt-1 block font-normal text-muted-foreground">
+                  20% of spend
+                </span>
+              </span>
+            </span>
+            {whiteGlove ? (
+              <span className="font-medium tabular-nums">
+                {moneyFormat.format(estimate.whiteGloveAmount)}
+              </span>
+            ) : null}
+          </label>
           <div className="flex items-baseline justify-between gap-4 border-t pt-4">
             <p className="text-muted-foreground">Monthly total</p>
             <p className="text-base font-medium tabular-nums">
