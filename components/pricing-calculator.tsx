@@ -19,7 +19,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { quote } from "@/lib/pricing";
+import { priceUsage } from "@/lib/pricing";
+import type { SavedForm, SavedRow } from "@/lib/saved-form";
 
 type NamedRow = {
   id: string;
@@ -86,8 +87,6 @@ function randomBubbleColor() {
   return bubbleColors[Math.floor(Math.random() * bubbleColors.length)];
 }
 
-const recordsPerUnit = 1_000_000;
-const daysInMonth = 30;
 const countFormat = new Intl.NumberFormat("en-US");
 const moneyFormat = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -300,6 +299,59 @@ function parseCount(value: string) {
   return parsed;
 }
 
+function savedRow(row: NamedRow): SavedRow {
+  const saved: SavedRow = {
+    id: row.id,
+    name: row.name,
+    placeholder: row.placeholder,
+    records: row.records,
+  };
+  if (row.generatedFor) {
+    saved.generatedFor = row.generatedFor;
+  }
+  if (row.linkedProjectId) {
+    saved.linkedProjectId = row.linkedProjectId;
+  }
+  if (row.generatedName) {
+    saved.generatedName = row.generatedName;
+  }
+  if (row.generatedRecords) {
+    saved.generatedRecords = row.generatedRecords;
+  }
+  if (row.description) {
+    saved.description = row.description;
+  }
+  if (row.bubbleColor) {
+    saved.bubbleColor = row.bubbleColor;
+  }
+  return saved;
+}
+
+function toSavedForm(
+  sources: NamedRow[],
+  projects: NamedRow[],
+  nextSourceId: number,
+  nextProjectId: number,
+): SavedForm {
+  return {
+    sources: sources.map(savedRow),
+    projects: projects.map(savedRow),
+    nextSourceId,
+    nextProjectId,
+  };
+}
+
+const starterForm = toSavedForm(
+  starterSources,
+  starterProjects,
+  starterSources.length + 1,
+  starterProjects.length + 1,
+);
+
+function sameForm(left: SavedForm, right: SavedForm) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 function fifthOfRecords(records: string) {
   const amount = parseCount(records) / 5;
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -309,16 +361,33 @@ function fifthOfRecords(records: string) {
   return String(Math.round(amount * 1000) / 1000);
 }
 
-export function PricingCalculator() {
-  const [sources, setSources] = useState(starterSources);
-  const [nextSourceId, setNextSourceId] = useState(starterSources.length + 1);
-  const [projects, setProjects] = useState(starterProjects);
+export function PricingCalculator({
+  quoteId,
+  initialForm,
+}: {
+  quoteId?: string;
+  initialForm?: SavedForm;
+}) {
+  const [sources, setSources] = useState<NamedRow[]>(
+    initialForm ? initialForm.sources : starterSources,
+  );
+  const [nextSourceId, setNextSourceId] = useState(
+    initialForm ? initialForm.nextSourceId : starterSources.length + 1,
+  );
+  const [projects, setProjects] = useState<NamedRow[]>(
+    initialForm ? initialForm.projects : starterProjects,
+  );
   const [nextProjectId, setNextProjectId] = useState(
-    starterProjects.length + 1,
+    initialForm ? initialForm.nextProjectId : starterProjects.length + 1,
   );
   const sourcesRef = useRef(sources);
   const projectsRef = useRef(projects);
   const nextProjectIdRef = useRef(nextProjectId);
+  const quoteIdRef = useRef(quoteId ? quoteId : "");
+  const latestForm = useRef<SavedForm | null>(null);
+  const saveTimer = useRef<number | null>(null);
+  const pendingWrite = useRef<Promise<void> | null>(null);
+  const hydrating = useRef(true);
   const requestedProjectNames = useRef(new Set<string>());
   const [apps, setApps] = useState<KnownApp[]>([]);
   const sourceOptions = useMemo<SourceOption[]>(
@@ -550,20 +619,100 @@ export function PricingCalculator() {
     }
   }, [sources]);
 
-  const totalRecords = sources.reduce(
-    (sum, source) => sum + parseCount(source.records) * recordsPerUnit,
-    0,
-  );
-  const projectRecords = projects.reduce(
-    (sum, project) =>
-      sum + parseCount(project.records) * recordsPerUnit * daysInMonth,
-    0,
-  );
-  const estimate = quote({
-    totalRecords,
-    projectRecords,
-    projects: projects.length,
+  const estimate = priceUsage({
+    sources: sources.map((source) => ({
+      name: source.name,
+      recordsInMillions: parseCount(source.records),
+    })),
+    projects: projects.map((project) => ({
+      name: project.name,
+      recordsInMillions: parseCount(project.records),
+    })),
   });
+
+  useEffect(() => {
+    const form = toSavedForm(sources, projects, nextSourceId, nextProjectId);
+    latestForm.current = form;
+    if (saveTimer.current !== null) {
+      window.clearTimeout(saveTimer.current);
+    }
+    if (hydrating.current) {
+      hydrating.current = false;
+      return;
+    }
+
+    async function saveNow() {
+      const current = latestForm.current;
+      if (!current) {
+        return;
+      }
+      if (quoteIdRef.current === "" && sameForm(current, starterForm)) {
+        return;
+      }
+
+      if (quoteIdRef.current === "") {
+        const response = await fetch("/api/quotes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(current),
+        });
+        if (!response.ok) {
+          return;
+        }
+        const payload = (await response.json()) as { id?: unknown };
+        if (typeof payload.id !== "string" || payload.id === "") {
+          return;
+        }
+        quoteIdRef.current = payload.id;
+        window.history.replaceState(null, "", `/q/${payload.id}`);
+        const latest = latestForm.current;
+        if (!latest || sameForm(latest, current)) {
+          return;
+        }
+        await fetch(`/api/quotes/${payload.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(latest),
+        });
+        return;
+      }
+
+      const latest = latestForm.current;
+      if (!latest) {
+        return;
+      }
+      await fetch(`/api/quotes/${quoteIdRef.current}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(latest),
+      });
+    }
+
+    async function runSave() {
+      if (pendingWrite.current) {
+        await pendingWrite.current;
+      }
+      const run = saveNow();
+      pendingWrite.current = run;
+      try {
+        await run;
+      } finally {
+        if (pendingWrite.current === run) {
+          pendingWrite.current = null;
+        }
+      }
+    }
+
+    saveTimer.current = window.setTimeout(() => {
+      void runSave();
+    }, 500);
+
+    return () => {
+      if (saveTimer.current !== null) {
+        window.clearTimeout(saveTimer.current);
+      }
+    };
+  }, [sources, projects, nextSourceId, nextProjectId]);
 
   function updateSource(
     id: string,
@@ -800,54 +949,45 @@ export function PricingCalculator() {
       <Card className="lg:sticky lg:top-6">
         <CardHeader>
           <CardTitle>Estimate</CardTitle>
-          <CardDescription>From your records and projects.</CardDescription>
+          <CardDescription>$50 per million records each month.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <dl className="flex flex-col gap-3">
-            <div className="flex items-baseline justify-between gap-4">
+          <dl className="flex flex-col gap-4">
+            <div className="flex items-start justify-between gap-4">
               <EstimateHint
                 label="Source records"
                 hint="The records stored in each data source."
               />
-              <dd className="font-medium tabular-nums">
-                {countFormat.format(estimate.totalRecords)}
+              <dd className="text-right">
+                <span className="block font-medium tabular-nums">
+                  {countFormat.format(estimate.sourceRecords)}
+                </span>
+                <span className="block text-muted-foreground tabular-nums">
+                  {moneyFormat.format(estimate.sourceAmount)}
+                </span>
               </dd>
             </div>
-            <div className="flex items-baseline justify-between gap-4">
-              <dt className="text-muted-foreground">Project records</dt>
-              <dd className="font-medium tabular-nums">
-                {countFormat.format(estimate.projectRecords)}
-              </dd>
-            </div>
-            <div className="flex items-baseline justify-between gap-4">
+            <div className="flex items-start justify-between gap-4">
               <EstimateHint
-                label="Projects"
-                hint="Projects update hourly but only count towards usage 1x per day."
+                label="Project records"
+                hint="Projects update hourly but only count towards usage 1x per day. That daily total is billed across the month."
               />
-              <dd className="font-medium tabular-nums">
-                {countFormat.format(estimate.projects)}
+              <dd className="text-right">
+                <span className="block font-medium tabular-nums">
+                  {countFormat.format(estimate.projectRecords)}
+                </span>
+                <span className="block text-muted-foreground tabular-nums">
+                  {moneyFormat.format(estimate.projectAmount)}
+                </span>
               </dd>
             </div>
-            {estimate.lines.map((line) => (
-              <div
-                key={line.label}
-                className="flex items-baseline justify-between gap-4"
-              >
-                <dt className="text-muted-foreground">{line.label}</dt>
-                <dd className="font-medium tabular-nums">
-                  {moneyFormat.format(line.amount)}
-                </dd>
-              </div>
-            ))}
           </dl>
-          {estimate.lines.length > 0 ? (
-            <div className="flex items-baseline justify-between gap-4 border-t pt-4">
-              <p className="text-muted-foreground">Monthly total</p>
-              <p className="text-base font-medium tabular-nums">
-                {moneyFormat.format(estimate.monthlyTotal)}
-              </p>
-            </div>
-          ) : null}
+          <div className="flex items-baseline justify-between gap-4 border-t pt-4">
+            <p className="text-muted-foreground">Monthly total</p>
+            <p className="text-base font-medium tabular-nums">
+              {moneyFormat.format(estimate.monthlyTotal)}
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>
