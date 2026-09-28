@@ -89,8 +89,11 @@ function readRow(value: unknown): SavedRow | null {
   return row
 }
 
-function readRows(value: unknown) {
-  if (!Array.isArray(value) || value.length === 0 || value.length > 40) {
+function readRows(value: unknown, allowEmpty = false) {
+  if (!Array.isArray(value) || value.length > 40) {
+    return null
+  }
+  if (!allowEmpty && value.length === 0) {
     return null
   }
 
@@ -129,7 +132,7 @@ export function parseSavedForm(value: unknown): SavedForm | null {
   ]
   let nextAutomationId = 2
   if (value.automations !== undefined) {
-    const parsed = readRows(value.automations)
+    const parsed = readRows(value.automations, true)
     if (!parsed) {
       return null
     }

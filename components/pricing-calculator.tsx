@@ -1076,10 +1076,6 @@ export function PricingCalculator({
 
   function removeAutomation(id: string) {
     setAutomations((current) => {
-      if (current.length <= 1) {
-        return current;
-      }
-
       const next = current.filter((automation) => automation.id !== id);
       automationsRef.current = next;
       return next;
@@ -1266,9 +1262,6 @@ export function PricingCalculator({
 
         <fieldset className="flex flex-col gap-4">
           <legend className="text-sm font-medium">Automations</legend>
-          <p className="text-sm text-muted-foreground">
-            $500 per million rows, separate from sources and projects.
-          </p>
           <div className="flex flex-col gap-3">
             {automations.map((automation) => {
               const nameId = `${automation.id}-name`;
@@ -1320,7 +1313,6 @@ export function PricingCalculator({
                       variant="ghost"
                       size="icon"
                       aria-label={`Remove ${automation.name || automation.placeholder || "automation"}`}
-                      disabled={automations.length <= 1}
                       onClick={() => {
                         removeAutomation(automation.id);
                       }}
@@ -1389,7 +1381,7 @@ export function PricingCalculator({
             <div className="flex items-start justify-between gap-4">
               <EstimateHint
                 label="Automations"
-                hint="Billed at $500 per million rows, separate from sources and projects."
+                hint="Automations are billed at $500 per million rows, separate from sources and projects."
               />
               <dd className="text-right">
                 <span className="block font-medium tabular-nums">
