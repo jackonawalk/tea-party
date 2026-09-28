@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { GeneratedKind } from "@/lib/saved-form";
 import { Eye, EyeOff, Info, Trash2 } from "lucide-react";
 import CreatableSelect from "react-select/creatable";
 import type { StylesConfig } from "react-select";
@@ -14,34 +15,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { priceUsage } from "@/lib/pricing";
-import {
-  defaultQuoteTitle,
-  type SavedForm,
-  type SavedRow,
-} from "@/lib/saved-form";
+import { defaultQuoteTitle, type SavedForm } from "@/lib/saved-form";
 import { MermaidDiagram } from "@/components/mermaid-diagram";
-
-type NamedRow = {
-  id: string;
-  name: string;
-  placeholder: string;
-  records: string;
-  generatedFor?: string;
-  linkedProjectId?: string;
-  generatedName?: string;
-  generatedRecords?: string;
-  generatedAutomationFor?: string;
-  linkedAutomationId?: string;
-  generatedAutomationName?: string;
-  generatedAutomationRecords?: string;
-  description?: string;
-  diagram?: string;
-  diagramHidden?: boolean;
-  diagramGenerating?: boolean;
-  bubbleColor?: string;
-  generating?: boolean;
-  revealing?: boolean;
-};
+import { toSavedForm, useAutosave } from "@/components/use-autosave";
+import {
+  parseCount,
+  useGeneratedRows,
+  type NamedRow,
+} from "@/components/use-generated-rows";
 
 type KnownApp = {
   name: string;
@@ -85,22 +66,23 @@ const starterAutomations: NamedRow[] = [
   },
 ];
 
-const bubbleColors = [
-  "bg-rose-100 text-rose-950 dark:bg-rose-950/50 dark:text-rose-100",
-  "bg-sky-100 text-sky-950 dark:bg-sky-950/50 dark:text-sky-100",
-  "bg-amber-100 text-amber-950 dark:bg-amber-950/50 dark:text-amber-100",
-  "bg-emerald-100 text-emerald-950 dark:bg-emerald-950/50 dark:text-emerald-100",
-  "bg-violet-100 text-violet-950 dark:bg-violet-950/50 dark:text-violet-100",
-  "bg-orange-100 text-orange-950 dark:bg-orange-950/50 dark:text-orange-100",
-  "bg-teal-100 text-teal-950 dark:bg-teal-950/50 dark:text-teal-100",
-  "bg-fuchsia-100 text-fuchsia-950 dark:bg-fuchsia-950/50 dark:text-fuchsia-100",
-  "bg-indigo-100 text-indigo-950 dark:bg-indigo-950/50 dark:text-indigo-100",
-  "bg-lime-100 text-lime-950 dark:bg-lime-950/50 dark:text-lime-100",
-];
-
-function randomBubbleColor() {
-  return bubbleColors[Math.floor(Math.random() * bubbleColors.length)];
-}
+const generatedCopy: Record<
+  GeneratedKind,
+  { legend: string; label: string; generating: string; add: string }
+> = {
+  project: {
+    legend: "Projects",
+    label: "Project",
+    generating: "Dreaming up a project",
+    add: "Add project",
+  },
+  automation: {
+    legend: "Automations",
+    label: "Automation",
+    generating: "Dreaming up an automation",
+    add: "Add automation",
+  },
+};
 
 const countFormat = new Intl.NumberFormat("en-US");
 const moneyFormat = new Intl.NumberFormat("en-US", {
@@ -360,94 +342,107 @@ function RecordsField({
   );
 }
 
-function hasRealRecordCount(records: string) {
-  const trimmed = records.trim();
-  if (trimmed === "" || trimmed === "0") {
-    return false;
-  }
+function GeneratedRowList({
+  kind,
+  rows,
+  onUpdate,
+  onAdd,
+  onRemove,
+}: {
+  kind: GeneratedKind;
+  rows: NamedRow[];
+  onUpdate: (
+    kind: GeneratedKind,
+    id: string,
+    patch: Partial<Pick<NamedRow, "name" | "records" | "diagramHidden">>,
+  ) => void;
+  onAdd: (kind: GeneratedKind) => void;
+  onRemove: (kind: GeneratedKind, id: string) => void;
+}) {
+  const copy = generatedCopy[kind];
 
-  return parseCount(trimmed) > 0;
-}
+  return (
+    <fieldset className="flex flex-col gap-4">
+      <legend className="sr-only text-sm font-medium">{copy.legend}</legend>
+      <div className="flex flex-col gap-3">
+        {rows.map((row) => {
+          const nameId = `${row.id}-name`;
+          const recordsId = `${row.id}-records`;
 
-function parseCount(value: string) {
-  if (value.trim() === "") {
-    return 0;
-  }
-
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    return 0;
-  }
-
-  return parsed;
-}
-
-function savedRow(row: NamedRow): SavedRow {
-  const saved: SavedRow = {
-    id: row.id,
-    name: row.name,
-    placeholder: row.placeholder,
-    records: row.records,
-  };
-  if (row.generatedFor) {
-    saved.generatedFor = row.generatedFor;
-  }
-  if (row.linkedProjectId) {
-    saved.linkedProjectId = row.linkedProjectId;
-  }
-  if (row.generatedName) {
-    saved.generatedName = row.generatedName;
-  }
-  if (row.generatedRecords) {
-    saved.generatedRecords = row.generatedRecords;
-  }
-  if (row.generatedAutomationFor) {
-    saved.generatedAutomationFor = row.generatedAutomationFor;
-  }
-  if (row.linkedAutomationId) {
-    saved.linkedAutomationId = row.linkedAutomationId;
-  }
-  if (row.generatedAutomationName) {
-    saved.generatedAutomationName = row.generatedAutomationName;
-  }
-  if (row.generatedAutomationRecords) {
-    saved.generatedAutomationRecords = row.generatedAutomationRecords;
-  }
-  if (row.description) {
-    saved.description = row.description;
-  }
-  if (row.diagram) {
-    saved.diagram = row.diagram;
-  }
-  if (row.diagramHidden) {
-    saved.diagramHidden = true;
-  }
-  if (row.bubbleColor) {
-    saved.bubbleColor = row.bubbleColor;
-  }
-  return saved;
-}
-
-function toSavedForm(
-  title: string,
-  sources: NamedRow[],
-  projects: NamedRow[],
-  automations: NamedRow[],
-  nextSourceId: number,
-  nextProjectId: number,
-  nextAutomationId: number,
-  whiteGlove: boolean,
-): SavedForm {
-  return {
-    title,
-    sources: sources.map(savedRow),
-    projects: projects.map(savedRow),
-    automations: automations.map(savedRow),
-    nextSourceId,
-    nextProjectId,
-    nextAutomationId,
-    whiteGlove,
-  };
+          return (
+            <div
+              key={row.id}
+              className="grid gap-3 rounded-xl border bg-card p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start"
+            >
+              <div className="flex flex-col gap-2">
+                <Label htmlFor={nameId}>{copy.label}</Label>
+                <div className="relative">
+                  <Input
+                    id={nameId}
+                    value={row.name}
+                    placeholder={row.generating ? "" : row.placeholder}
+                    readOnly={row.generating || row.revealing}
+                    aria-busy={row.generating}
+                    onChange={(event) => {
+                      onUpdate(kind, row.id, { name: event.target.value });
+                    }}
+                  />
+                  {row.generating ? (
+                    <GeneratingHint label={copy.generating} />
+                  ) : null}
+                </div>
+                {row.description ? (
+                  <GeneratedReply
+                    description={row.description}
+                    bubbleColor={row.bubbleColor}
+                  />
+                ) : null}
+              </div>
+              <div className="flex items-end gap-3">
+                <RecordsField
+                  id={recordsId}
+                  value={row.records}
+                  onChange={(records) => {
+                    onUpdate(kind, row.id, { records });
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Remove ${row.name || row.placeholder || kind}`}
+                  onClick={() => {
+                    onRemove(kind, row.id);
+                  }}
+                >
+                  <Trash2 />
+                </Button>
+              </div>
+              <DiagramBlock
+                diagram={row.diagram}
+                generating={row.diagramGenerating}
+                hidden={row.diagramHidden}
+                onHiddenChange={(diagramHidden) => {
+                  onUpdate(kind, row.id, { diagramHidden });
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            onAdd(kind);
+          }}
+        >
+          {copy.add}
+        </Button>
+      </div>
+    </fieldset>
+  );
 }
 
 const starterForm = toSavedForm(
@@ -460,29 +455,6 @@ const starterForm = toSavedForm(
   starterAutomations.length + 1,
   false,
 );
-
-function sameForm(left: SavedForm, right: SavedForm) {
-  return JSON.stringify(left) === JSON.stringify(right);
-}
-
-const projectShareOfSource = 0.2;
-const automationShareOfProject = 0.1;
-
-function suggestedRecords(
-  kind: "project" | "automation",
-  sourceRecords: string,
-) {
-  const projectRecords = parseCount(sourceRecords) * projectShareOfSource;
-  const amount =
-    kind === "project"
-      ? projectRecords
-      : projectRecords * automationShareOfProject;
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return "0";
-  }
-
-  return String(Math.round(amount * 10000) / 10000);
-}
 
 export function PricingCalculator({
   quoteId,
@@ -499,35 +471,35 @@ export function PricingCalculator({
   const [nextSourceId, setNextSourceId] = useState(
     initialForm ? initialForm.nextSourceId : starterSources.length + 1,
   );
-  const [projects, setProjects] = useState<NamedRow[]>(
-    initialForm ? initialForm.projects : starterProjects,
-  );
-  const [nextProjectId, setNextProjectId] = useState(
-    initialForm ? initialForm.nextProjectId : starterProjects.length + 1,
-  );
-  const [automations, setAutomations] = useState<NamedRow[]>(
-    initialForm ? initialForm.automations : starterAutomations,
-  );
-  const [nextAutomationId, setNextAutomationId] = useState(
-    initialForm ? initialForm.nextAutomationId : starterAutomations.length + 1,
-  );
   const [whiteGlove, setWhiteGlove] = useState(
     initialForm ? initialForm.whiteGlove : false,
   );
   const sourcesRef = useRef(sources);
-  const projectsRef = useRef(projects);
-  const automationsRef = useRef(automations);
-  const nextProjectIdRef = useRef(nextProjectId);
-  const nextAutomationIdRef = useRef(nextAutomationId);
-  const quoteIdRef = useRef(quoteId ? quoteId : "");
-  const latestForm = useRef<SavedForm | null>(null);
-  const saveTimer = useRef<number | null>(null);
-  const pendingWrite = useRef<Promise<void> | null>(null);
-  const hydrating = useRef(true);
   const focusNameId = useRef<string | null>(null);
-  const requestedProjectNames = useRef(new Set<string>());
-  const diagramTimers = useRef(new Map<string, number>());
-  const diagramTitles = useRef(new Map<string, string>());
+  const {
+    projects,
+    automations,
+    nextProjectId,
+    nextAutomationId,
+    updateRow,
+    addRow,
+    removeRow,
+  } = useGeneratedRows({
+    sources,
+    setSources,
+    sourcesRef,
+    initialProjects: initialForm ? initialForm.projects : starterProjects,
+    initialAutomations: initialForm
+      ? initialForm.automations
+      : starterAutomations,
+    initialNextProjectId: initialForm
+      ? initialForm.nextProjectId
+      : starterProjects.length + 1,
+    initialNextAutomationId: initialForm
+      ? initialForm.nextAutomationId
+      : starterAutomations.length + 1,
+    focusNameIdRef: focusNameId,
+  });
   const [apps, setApps] = useState<KnownApp[]>([]);
   const sourceOptions = useMemo<SourceOption[]>(
     () =>
@@ -562,255 +534,6 @@ export function PricingCalculator({
     };
   }, []);
 
-  type GeneratedKind = "project" | "automation";
-
-  function bucket(kind: GeneratedKind) {
-    if (kind === "project") {
-      return {
-        rowsRef: projectsRef,
-        setRows: setProjects,
-        nextIdRef: nextProjectIdRef,
-        setNextId: setNextProjectId,
-        placeholder: "Project name",
-        idPrefix: "project",
-        generatedFor: "generatedFor" as const,
-        linkedId: "linkedProjectId" as const,
-        generatedName: "generatedName" as const,
-        generatedRecords: "generatedRecords" as const,
-      };
-    }
-
-    return {
-      rowsRef: automationsRef,
-      setRows: setAutomations,
-      nextIdRef: nextAutomationIdRef,
-      setNextId: setNextAutomationId,
-      placeholder: "Automation name",
-      idPrefix: "automation",
-      generatedFor: "generatedAutomationFor" as const,
-      linkedId: "linkedAutomationId" as const,
-      generatedName: "generatedAutomationName" as const,
-      generatedRecords: "generatedAutomationRecords" as const,
-    };
-  }
-
-  function clearGenerating(kind: GeneratedKind, rowId: string) {
-    const { rowsRef, setRows } = bucket(kind);
-    setRows((current) => {
-      const next = current.map((row) =>
-        row.id === rowId ? { ...row, generating: false } : row,
-      );
-      rowsRef.current = next;
-      return next;
-    });
-  }
-
-  function reserveGenerating(kind: GeneratedKind, source: NamedRow) {
-    const fields = bucket(kind);
-    const current = fields.rowsRef.current;
-    const linkedId = source[fields.linkedId];
-    const linked = linkedId
-      ? current.find((row) => row.id === linkedId)
-      : undefined;
-    const generatedName = source[fields.generatedName];
-    const generatedRecords = source[fields.generatedRecords];
-    const userEdited =
-      linked !== undefined &&
-      !linked.revealing &&
-      generatedName !== undefined &&
-      (linked.name !== generatedName || linked.records !== generatedRecords);
-
-    if (linked && !userEdited) {
-      const next = current.map((row) =>
-        row.id === linked.id
-          ? {
-              ...row,
-              name: "",
-              description: "",
-              diagram: "",
-              records: "",
-              generating: true,
-            }
-          : row,
-      );
-      fields.rowsRef.current = next;
-      fields.setRows(next);
-      return linked.id;
-    }
-
-    const open = current.find(
-      (row) => row.name.trim() === "" && !row.generating,
-    );
-    if (open) {
-      const next = current.map((row) =>
-        row.id === open.id ? { ...row, generating: true } : row,
-      );
-      fields.rowsRef.current = next;
-      fields.setRows(next);
-      return open.id;
-    }
-
-    const id = `${fields.idPrefix}-${fields.nextIdRef.current}`;
-    fields.nextIdRef.current += 1;
-    fields.setNextId(fields.nextIdRef.current);
-    const next = [
-      ...current,
-      {
-        id,
-        name: "",
-        placeholder: fields.placeholder,
-        records: "",
-        generating: true,
-      },
-    ];
-    fields.rowsRef.current = next;
-    fields.setRows(next);
-    return id;
-  }
-
-  function revealGenerated(
-    kind: GeneratedKind,
-    sourceId: string,
-    sourceName: string,
-    rowId: string,
-    rowName: string,
-    description: string,
-    diagram: string,
-  ) {
-    const fields = bucket(kind);
-    const source = sourcesRef.current.find((item) => item.id === sourceId);
-    if (!source || source.name.trim() !== sourceName) {
-      clearGenerating(kind, rowId);
-      return;
-    }
-
-    const records = suggestedRecords(kind, source.records);
-
-    setSources((current) => {
-      const next = current.map((item) => {
-        if (item.id !== sourceId || item.name.trim() !== sourceName) {
-          return item;
-        }
-
-        return {
-          ...item,
-          [fields.generatedFor]: sourceName,
-          [fields.linkedId]: rowId,
-          [fields.generatedName]: rowName,
-          [fields.generatedRecords]: records,
-        };
-      });
-      sourcesRef.current = next;
-      return next;
-    });
-
-    let index = 0;
-    const tick = () => {
-      index += 1;
-      const partial = rowName.slice(0, index);
-      const done = index >= rowName.length;
-      fields.setRows((current) => {
-        const next = current.map((row) => {
-          if (row.id !== rowId) {
-            return row;
-          }
-
-          return {
-            ...row,
-            generating: false,
-            revealing: !done,
-            name: partial,
-            records,
-            description: done ? description : "",
-            diagram: done ? diagram : "",
-            bubbleColor: done
-              ? row.bubbleColor
-                ? row.bubbleColor
-                : randomBubbleColor()
-              : row.bubbleColor,
-          };
-        });
-        fields.rowsRef.current = next;
-        return next;
-      });
-      if (!done) {
-        window.setTimeout(tick, 38);
-      }
-    };
-    tick();
-  }
-
-  useEffect(() => {
-    const kinds: GeneratedKind[] = ["project", "automation"];
-    for (const source of sources) {
-      const sourceName = source.name.trim();
-      if (sourceName === "" || !hasRealRecordCount(source.records)) {
-        continue;
-      }
-
-      for (const kind of kinds) {
-        const fields = bucket(kind);
-        if (source[fields.generatedFor] === sourceName) {
-          continue;
-        }
-
-        const requestKey = `${kind}:${source.id}:${sourceName}`;
-        if (requestedProjectNames.current.has(requestKey)) {
-          continue;
-        }
-        requestedProjectNames.current.add(requestKey);
-        queueMicrotask(() => {
-          const rowId = reserveGenerating(kind, source);
-
-          void fetch("/api/project-name", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sourceName, kind }),
-          })
-            .then(async (response) => {
-              if (!response.ok) {
-                requestedProjectNames.current.delete(requestKey);
-                clearGenerating(kind, rowId);
-                return;
-              }
-
-              const payload = (await response.json()) as {
-                name?: unknown;
-                description?: unknown;
-                diagram?: unknown;
-              };
-              if (
-                typeof payload.name !== "string" ||
-                payload.name.trim() === "" ||
-                typeof payload.description !== "string" ||
-                payload.description.trim() === "" ||
-                typeof payload.diagram !== "string" ||
-                payload.diagram.trim() === ""
-              ) {
-                requestedProjectNames.current.delete(requestKey);
-                clearGenerating(kind, rowId);
-                return;
-              }
-
-              revealGenerated(
-                kind,
-                source.id,
-                sourceName,
-                rowId,
-                payload.name.trim(),
-                payload.description.trim(),
-                payload.diagram.trim(),
-              );
-            })
-            .catch(() => {
-              requestedProjectNames.current.delete(requestKey);
-              clearGenerating(kind, rowId);
-            });
-        });
-      }
-    }
-  }, [sources]);
-
   const estimate = priceUsage({
     sources: sources.map((source) => ({
       name: source.name,
@@ -827,98 +550,9 @@ export function PricingCalculator({
     whiteGlove,
   });
 
-  useEffect(() => {
-    const form = toSavedForm(
-      title,
-      sources,
-      projects,
-      automations,
-      nextSourceId,
-      nextProjectId,
-      nextAutomationId,
-      whiteGlove,
-    );
-    latestForm.current = form;
-    if (saveTimer.current !== null) {
-      window.clearTimeout(saveTimer.current);
-    }
-    if (hydrating.current) {
-      hydrating.current = false;
-      return;
-    }
-
-    async function saveNow() {
-      const current = latestForm.current;
-      if (!current) {
-        return;
-      }
-      if (quoteIdRef.current === "" && sameForm(current, starterForm)) {
-        return;
-      }
-
-      if (quoteIdRef.current === "") {
-        const response = await fetch("/api/quotes", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(current),
-        });
-        if (!response.ok) {
-          return;
-        }
-        const payload = (await response.json()) as { id?: unknown };
-        if (typeof payload.id !== "string" || payload.id === "") {
-          return;
-        }
-        quoteIdRef.current = payload.id;
-        window.history.replaceState(null, "", `/q/${payload.id}`);
-        const latest = latestForm.current;
-        if (!latest || sameForm(latest, current)) {
-          return;
-        }
-        await fetch(`/api/quotes/${payload.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(latest),
-        });
-        return;
-      }
-
-      const latest = latestForm.current;
-      if (!latest) {
-        return;
-      }
-      await fetch(`/api/quotes/${quoteIdRef.current}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(latest),
-      });
-    }
-
-    async function runSave() {
-      if (pendingWrite.current) {
-        await pendingWrite.current;
-      }
-      const run = saveNow();
-      pendingWrite.current = run;
-      try {
-        await run;
-      } finally {
-        if (pendingWrite.current === run) {
-          pendingWrite.current = null;
-        }
-      }
-    }
-
-    saveTimer.current = window.setTimeout(() => {
-      void runSave();
-    }, 500);
-
-    return () => {
-      if (saveTimer.current !== null) {
-        window.clearTimeout(saveTimer.current);
-      }
-    };
-  }, [
+  useAutosave({
+    quoteId,
+    title,
     sources,
     projects,
     automations,
@@ -926,8 +560,8 @@ export function PricingCalculator({
     nextProjectId,
     nextAutomationId,
     whiteGlove,
-    title,
-  ]);
+    starterForm,
+  });
 
   function updateSource(
     id: string,
@@ -978,107 +612,6 @@ export function PricingCalculator({
     document.getElementById(id)?.focus();
   }, [sources, projects, automations]);
 
-  function applyDiagram(
-    kind: GeneratedKind,
-    id: string,
-    patch: Partial<
-      Pick<
-        NamedRow,
-        "diagram" | "diagramGenerating" | "description" | "bubbleColor"
-      >
-    >,
-  ) {
-    const fields = bucket(kind);
-    fields.setRows((current) => {
-      const next = current.map((row) => {
-        if (row.id !== id) {
-          return row;
-        }
-
-        const updated = { ...row, ...patch };
-        if (updated.description && !updated.bubbleColor) {
-          updated.bubbleColor = randomBubbleColor();
-        }
-        return updated;
-      });
-      fields.rowsRef.current = next;
-      return next;
-    });
-  }
-
-  function scheduleDiagram(kind: GeneratedKind, id: string, name: string) {
-    const key = `${kind}:${id}`;
-    const existing = diagramTimers.current.get(key);
-    if (existing) {
-      window.clearTimeout(existing);
-    }
-
-    const title = name.trim();
-    diagramTitles.current.set(key, title);
-    if (title === "") {
-      applyDiagram(kind, id, {
-        diagram: "",
-        description: "",
-        diagramGenerating: false,
-      });
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      applyDiagram(kind, id, { diagramGenerating: true });
-      const fields = bucket(kind);
-      const source = sourcesRef.current.find(
-        (item) => item[fields.linkedId] === id,
-      );
-      const sourceName = source ? source.name.trim() : "";
-
-      void fetch("/api/project-name", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind, name: title, sourceName }),
-      })
-        .then(async (response) => {
-          if (diagramTitles.current.get(key) !== title) {
-            return;
-          }
-          if (!response.ok) {
-            applyDiagram(kind, id, { diagramGenerating: false });
-            return;
-          }
-
-          const payload = (await response.json()) as {
-            diagram?: unknown;
-            description?: unknown;
-          };
-          if (diagramTitles.current.get(key) !== title) {
-            return;
-          }
-          if (
-            typeof payload.diagram !== "string" ||
-            payload.diagram.trim() === "" ||
-            typeof payload.description !== "string" ||
-            payload.description.trim() === ""
-          ) {
-            applyDiagram(kind, id, { diagramGenerating: false });
-            return;
-          }
-
-          applyDiagram(kind, id, {
-            diagram: payload.diagram.trim(),
-            description: payload.description.trim(),
-            diagramGenerating: false,
-          });
-        })
-        .catch(() => {
-          if (diagramTitles.current.get(key) !== title) {
-            return;
-          }
-          applyDiagram(kind, id, { diagramGenerating: false });
-        });
-    }, 500);
-    diagramTimers.current.set(key, timer);
-  }
-
   function addSource() {
     const id = `source-${nextSourceId}`;
     focusNameId.current = `${id}-name`;
@@ -1089,124 +622,6 @@ export function PricingCalculator({
         { id, name: "", placeholder: "Source name", records: "" },
       ];
       sourcesRef.current = next;
-      return next;
-    });
-  }
-
-  function updateProject(
-    id: string,
-    patch: Partial<Pick<NamedRow, "name" | "records" | "diagramHidden">>,
-  ) {
-    setProjects((current) => {
-      const next = current.map((project) =>
-        project.id === id ? { ...project, ...patch } : project,
-      );
-      projectsRef.current = next;
-      return next;
-    });
-    if (patch.name !== undefined) {
-      scheduleDiagram("project", id, patch.name);
-    }
-  }
-
-  function removeProject(id: string) {
-    const isLast = projects.length === 1 && projects[0].id === id;
-    let blank: NamedRow | null = null;
-    if (isLast) {
-      const blankId = `project-${nextProjectIdRef.current}`;
-      nextProjectIdRef.current += 1;
-      setNextProjectId(nextProjectIdRef.current);
-      focusNameId.current = `${blankId}-name`;
-      blank = {
-        id: blankId,
-        name: "",
-        placeholder: "Project name",
-        records: "",
-      };
-    }
-
-    setProjects((current) => {
-      const next = current.filter((project) => project.id !== id);
-      if (next.length === 0 && blank) {
-        projectsRef.current = [blank];
-        return [blank];
-      }
-
-      projectsRef.current = next;
-      return next;
-    });
-  }
-
-  function addProject() {
-    const id = `project-${nextProjectIdRef.current}`;
-    focusNameId.current = `${id}-name`;
-    nextProjectIdRef.current += 1;
-    setNextProjectId(nextProjectIdRef.current);
-    setProjects((current) => {
-      const next = [
-        ...current,
-        { id, name: "", placeholder: "Project name", records: "" },
-      ];
-      projectsRef.current = next;
-      return next;
-    });
-  }
-
-  function updateAutomation(
-    id: string,
-    patch: Partial<Pick<NamedRow, "name" | "records" | "diagramHidden">>,
-  ) {
-    setAutomations((current) => {
-      const next = current.map((automation) =>
-        automation.id === id ? { ...automation, ...patch } : automation,
-      );
-      automationsRef.current = next;
-      return next;
-    });
-    if (patch.name !== undefined) {
-      scheduleDiagram("automation", id, patch.name);
-    }
-  }
-
-  function removeAutomation(id: string) {
-    const isLast = automations.length === 1 && automations[0].id === id;
-    let blank: NamedRow | null = null;
-    if (isLast) {
-      const blankId = `automation-${nextAutomationIdRef.current}`;
-      nextAutomationIdRef.current += 1;
-      setNextAutomationId(nextAutomationIdRef.current);
-      focusNameId.current = `${blankId}-name`;
-      blank = {
-        id: blankId,
-        name: "",
-        placeholder: "Automation name",
-        records: "",
-      };
-    }
-
-    setAutomations((current) => {
-      const next = current.filter((automation) => automation.id !== id);
-      if (next.length === 0 && blank) {
-        automationsRef.current = [blank];
-        return [blank];
-      }
-
-      automationsRef.current = next;
-      return next;
-    });
-  }
-
-  function addAutomation() {
-    const id = `automation-${nextAutomationIdRef.current}`;
-    focusNameId.current = `${id}-name`;
-    nextAutomationIdRef.current += 1;
-    setNextAutomationId(nextAutomationIdRef.current);
-    setAutomations((current) => {
-      const next = [
-        ...current,
-        { id, name: "", placeholder: "Automation name", records: "" },
-      ];
-      automationsRef.current = next;
       return next;
     });
   }
@@ -1289,163 +704,20 @@ export function PricingCalculator({
           </div>
         </fieldset>
 
-        <fieldset className="flex flex-col gap-4">
-          <legend className="sr-only text-sm font-medium">Projects</legend>
-          <div className="flex flex-col gap-3">
-            {projects.map((project) => {
-              const nameId = `${project.id}-name`;
-              const recordsId = `${project.id}-records`;
-
-              return (
-                <div
-                  key={project.id}
-                  className="grid gap-3 rounded-xl border bg-card p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start"
-                >
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor={nameId}>Project</Label>
-                    <div className="relative">
-                      <Input
-                        id={nameId}
-                        value={project.name}
-                        placeholder={
-                          project.generating ? "" : project.placeholder
-                        }
-                        readOnly={project.generating || project.revealing}
-                        aria-busy={project.generating}
-                        onChange={(event) => {
-                          updateProject(project.id, {
-                            name: event.target.value,
-                          });
-                        }}
-                      />
-                      {project.generating ? (
-                        <GeneratingHint label="Dreaming up a project" />
-                      ) : null}
-                    </div>
-                    {project.description ? (
-                      <GeneratedReply
-                        description={project.description}
-                        bubbleColor={project.bubbleColor}
-                      />
-                    ) : null}
-                  </div>
-                  <div className="flex items-end gap-3">
-                    <RecordsField
-                      id={recordsId}
-                      value={project.records}
-                      onChange={(records) => {
-                        updateProject(project.id, { records });
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Remove ${project.name || project.placeholder || "project"}`}
-                      onClick={() => {
-                        removeProject(project.id);
-                      }}
-                    >
-                      <Trash2 />
-                    </Button>
-                  </div>
-                  <DiagramBlock
-                    diagram={project.diagram}
-                    generating={project.diagramGenerating}
-                    hidden={project.diagramHidden}
-                    onHiddenChange={(diagramHidden) => {
-                      updateProject(project.id, { diagramHidden });
-                    }}
-                  />
-                </div>
-              );
-            })}
-          </div>
-          <div>
-            <Button type="button" variant="outline" onClick={addProject}>
-              Add project
-            </Button>
-          </div>
-        </fieldset>
-
-        <fieldset className="flex flex-col gap-4">
-          <legend className="text-sm font-medium sr-only">Automations</legend>
-          <div className="flex flex-col gap-3">
-            {automations.map((automation) => {
-              const nameId = `${automation.id}-name`;
-              const recordsId = `${automation.id}-records`;
-
-              return (
-                <div
-                  key={automation.id}
-                  className="grid gap-3 rounded-xl border bg-card p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start"
-                >
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor={nameId}>Automation</Label>
-                    <div className="relative">
-                      <Input
-                        id={nameId}
-                        value={automation.name}
-                        placeholder={
-                          automation.generating ? "" : automation.placeholder
-                        }
-                        readOnly={automation.generating || automation.revealing}
-                        aria-busy={automation.generating}
-                        onChange={(event) => {
-                          updateAutomation(automation.id, {
-                            name: event.target.value,
-                          });
-                        }}
-                      />
-                      {automation.generating ? (
-                        <GeneratingHint label="Dreaming up an automation" />
-                      ) : null}
-                    </div>
-                    {automation.description ? (
-                      <GeneratedReply
-                        description={automation.description}
-                        bubbleColor={automation.bubbleColor}
-                      />
-                    ) : null}
-                  </div>
-                  <div className="flex items-end gap-3">
-                    <RecordsField
-                      id={recordsId}
-                      value={automation.records}
-                      onChange={(records) => {
-                        updateAutomation(automation.id, { records });
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Remove ${automation.name || automation.placeholder || "automation"}`}
-                      onClick={() => {
-                        removeAutomation(automation.id);
-                      }}
-                    >
-                      <Trash2 />
-                    </Button>
-                  </div>
-                  <DiagramBlock
-                    diagram={automation.diagram}
-                    generating={automation.diagramGenerating}
-                    hidden={automation.diagramHidden}
-                    onHiddenChange={(diagramHidden) => {
-                      updateAutomation(automation.id, { diagramHidden });
-                    }}
-                  />
-                </div>
-              );
-            })}
-          </div>
-          <div>
-            <Button type="button" variant="outline" onClick={addAutomation}>
-              Add automation
-            </Button>
-          </div>
-        </fieldset>
+        <GeneratedRowList
+          kind="project"
+          rows={projects}
+          onUpdate={updateRow}
+          onAdd={addRow}
+          onRemove={removeRow}
+        />
+        <GeneratedRowList
+          kind="automation"
+          rows={automations}
+          onUpdate={updateRow}
+          onAdd={addRow}
+          onRemove={removeRow}
+        />
       </form>
 
       <Card className="lg:sticky lg:top-6">

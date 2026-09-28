@@ -1,16 +1,18 @@
+export type GeneratedKind = "project" | "automation"
+
+export type GeneratedLink = {
+  sourceName: string
+  linkedId: string
+  name: string
+  records: string
+}
+
 export type SavedRow = {
   id: string
   name: string
   placeholder: string
   records: string
-  generatedFor?: string
-  linkedProjectId?: string
-  generatedName?: string
-  generatedRecords?: string
-  generatedAutomationFor?: string
-  linkedAutomationId?: string
-  generatedAutomationName?: string
-  generatedAutomationRecords?: string
+  generated?: Partial<Record<GeneratedKind, GeneratedLink>>
   description?: string
   diagram?: string
   diagramHidden?: boolean
@@ -30,19 +32,27 @@ export type SavedForm = {
   whiteGlove: boolean
 }
 
-const optionalKeys = [
-  "generatedFor",
-  "linkedProjectId",
-  "generatedName",
-  "generatedRecords",
-  "generatedAutomationFor",
-  "linkedAutomationId",
-  "generatedAutomationName",
-  "generatedAutomationRecords",
-  "description",
-  "diagram",
-  "bubbleColor",
-] as const
+const optionalKeys = ["description", "diagram", "bubbleColor"] as const
+
+const generatedKinds: GeneratedKind[] = ["project", "automation"]
+
+const legacyLinkKeys: Record<
+  GeneratedKind,
+  { sourceName: string; linkedId: string; name: string; records: string }
+> = {
+  project: {
+    sourceName: "generatedFor",
+    linkedId: "linkedProjectId",
+    name: "generatedName",
+    records: "generatedRecords",
+  },
+  automation: {
+    sourceName: "generatedAutomationFor",
+    linkedId: "linkedAutomationId",
+    name: "generatedAutomationName",
+    records: "generatedAutomationRecords",
+  },
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -54,6 +64,102 @@ function readCount(value: unknown) {
   }
 
   return value
+}
+
+function readLink(value: unknown): GeneratedLink | null | undefined {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  const sourceName = value.sourceName
+  const linkedId = value.linkedId
+  const name = value.name
+  const records = value.records
+  const fields = [sourceName, linkedId, name, records]
+  if (fields.every((field) => field === undefined || field === "")) {
+    return undefined
+  }
+  if (
+    typeof sourceName !== "string" ||
+    typeof linkedId !== "string" ||
+    typeof name !== "string" ||
+    typeof records !== "string" ||
+    sourceName === "" ||
+    linkedId === "" ||
+    name === "" ||
+    records === ""
+  ) {
+    return null
+  }
+
+  return { sourceName, linkedId, name, records }
+}
+
+function readLegacyLink(
+  value: Record<string, unknown>,
+  kind: GeneratedKind,
+): GeneratedLink | null | undefined {
+  const keys = legacyLinkKeys[kind]
+  const sourceName = value[keys.sourceName]
+  const linkedId = value[keys.linkedId]
+  const name = value[keys.name]
+  const records = value[keys.records]
+  const fields = [sourceName, linkedId, name, records]
+  if (fields.every((field) => field === undefined)) {
+    return undefined
+  }
+  if (
+    typeof sourceName !== "string" ||
+    typeof linkedId !== "string" ||
+    typeof name !== "string" ||
+    typeof records !== "string"
+  ) {
+    return null
+  }
+  if (sourceName === "" || linkedId === "" || name === "" || records === "") {
+    return undefined
+  }
+
+  return { sourceName, linkedId, name, records }
+}
+
+function readGenerated(
+  value: Record<string, unknown>,
+): Partial<Record<GeneratedKind, GeneratedLink>> | null {
+  const generated: Partial<Record<GeneratedKind, GeneratedLink>> = {}
+
+  if (value.generated !== undefined) {
+    if (!isRecord(value.generated)) {
+      return null
+    }
+    for (const kind of generatedKinds) {
+      if (value.generated[kind] === undefined) {
+        continue
+      }
+      const link = readLink(value.generated[kind])
+      if (link === null) {
+        return null
+      }
+      if (link) {
+        generated[kind] = link
+      }
+    }
+  }
+
+  for (const kind of generatedKinds) {
+    if (generated[kind]) {
+      continue
+    }
+    const link = readLegacyLink(value, kind)
+    if (link === null) {
+      return null
+    }
+    if (link) {
+      generated[kind] = link
+    }
+  }
+
+  return generated
 }
 
 function readRow(value: unknown): SavedRow | null {
@@ -97,6 +203,14 @@ function readRow(value: unknown): SavedRow | null {
     if (value.diagramHidden) {
       row.diagramHidden = true
     }
+  }
+
+  const generated = readGenerated(value)
+  if (!generated) {
+    return null
+  }
+  if (generated.project || generated.automation) {
+    row.generated = generated
   }
 
   return row
