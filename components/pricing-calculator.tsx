@@ -84,7 +84,10 @@ const generatedCopy: Record<
   },
 };
 
-const countFormat = new Intl.NumberFormat("en-US");
+const countFormat = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 2,
+});
 const moneyFormat = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -735,36 +738,41 @@ export function PricingCalculator({
                 <span className="block font-medium tabular-nums">
                   {countFormat.format(estimate.sourceRecords)}
                 </span>
-                <span className="block text-muted-foreground tabular-nums">
-                  {moneyFormat.format(estimate.sourceAmount)}
-                </span>
               </dd>
             </div>
             <div className="flex items-start justify-between gap-4">
               <EstimateHint
                 label="Projects"
-                hint="Projects update hourly but only count towards usage 1x per day. That daily total is billed across the month."
+                hint="Projects refresh hourly but are metered daily. Multiply each project's daily usage by 30 to estimate monthly usage."
               />
               <dd className="text-right">
                 <span className="block font-medium tabular-nums">
                   {countFormat.format(estimate.projectRecords)}
                 </span>
+              </dd>
+            </div>
+            <div className="flex items-start justify-between gap-4">
+              <EstimateHint
+                label="Credits used"
+                hint={`One credit is 1M Records`}
+              />
+              <dd className="text-right">
+                <span className="block font-medium tabular-nums">
+                  {countFormat.format(estimate.credits)}
+                </span>
                 <span className="block text-muted-foreground tabular-nums">
-                  {moneyFormat.format(estimate.projectAmount)}
+                  {moneyFormat.format(estimate.creditAmount)}
                 </span>
               </dd>
             </div>
             <div className="flex items-start justify-between gap-4">
               <EstimateHint
                 label="Automations"
-                hint="Automations are billed at $500 per million rows, separate from sources and projects."
+                hint="Automations are not billed yet and do not count toward credits."
               />
               <dd className="text-right">
                 <span className="block font-medium tabular-nums">
                   {countFormat.format(estimate.automationRecords)}
-                </span>
-                <span className="block text-muted-foreground tabular-nums">
-                  {moneyFormat.format(estimate.automationAmount)}
                 </span>
               </dd>
             </div>
