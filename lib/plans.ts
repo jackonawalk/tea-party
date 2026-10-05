@@ -4,6 +4,7 @@ export type Plan = {
   integrations: string[]
   name: string
   price: number
+  credits: number
   upToSyncedRows: number
   upToProjectRecords: number
   actionsPerMonth: number
@@ -14,15 +15,15 @@ export type Plan = {
 // Starter is the base, sized with the pricing calculator. Records are in
 // millions and one action is one automation record.
 const starterPrice = 500
-const starterSyncedRows = 1
+const starterSyncedRows = .5
 const starterProjectRecords = 0.25
 const starterActions = 0.001
 
 const tiers = [
-  { name: "Starter", price: 500, users: 3, integrations: ["Files", "SaaS"] },
-  { name: "Growth", price: 1000, users: 10, integrations: ["SQL"] },
-  { name: "Scale", price: 3000, users: 25, integrations: ["ERPs", "Warehouses"] },
-  { name: "Enterprise", price: 10000, users: 50, integrations: [] },
+  { name: "Starter", credits: 1, price: 500, users: 3, integrations: ["Files", "SaaS"] },
+  { name: "Growth", credits: 5, price: 1000, users: 10, integrations: ["SQL"] },
+  { name: "Scale", credits: 10, price: 3000, users: 25, integrations: ["ERPs", "Warehouses"] },
+  { name: "Enterprise", credits: 20, price: 10000, users: 50, integrations: [] },
 ]
 
 function planFor(tier: (typeof tiers)[number], index: number): Plan {
@@ -42,6 +43,7 @@ function planFor(tier: (typeof tiers)[number], index: number): Plan {
   return {
     name: tier.name,
     price: tier.price,
+    credits: tier.credits,
     integrations: tiers
       .slice(0, index + 1)
       .flatMap((earlier) => earlier.integrations),

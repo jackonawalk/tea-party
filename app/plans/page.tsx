@@ -107,6 +107,16 @@ export default function PlansPage() {
           </thead>
           <tbody>
             <tr>
+              <th className={rowHeaderClass} scope="row">
+                Credits
+              </th>
+              {plans.map((plan) => (
+                <td key={plan.name} className="px-4 py-4 tabular-nums">
+                  {plan.credits}
+                </td>
+              ))}
+            </tr>
+            <tr className="border-t">
               <th
                 className={groupHeaderClass}
                 colSpan={plans.length + 1}
