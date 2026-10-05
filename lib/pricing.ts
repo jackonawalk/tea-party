@@ -1,7 +1,8 @@
 const recordsPerMillion = 1_000_000
 
 // One credit is 1M rows, and sources and projects share the same rate.
-export const pricePerCredit = 50
+// This is the default price per credit, which callers can override.
+export const defaultPricePerCredit = 500
 export const minimumCredits = 1
 export const whiteGloveRate = 0.2
 export const daysInMonth = 30
@@ -52,6 +53,7 @@ export function priceUsage(input: {
   projects: UsageRow[]
   automations: UsageRow[]
   whiteGlove: boolean
+  pricePerCredit?: number
 }): PricedQuote {
   // Projects are measured daily, so their records count once per day of the month.
   const sources = toRows(input.sources, 1)
@@ -64,6 +66,10 @@ export function priceUsage(input: {
     minimumCredits,
     Math.ceil((sourceRecords + projectRecords) / recordsPerMillion),
   )
+  const pricePerCredit =
+    input.pricePerCredit === undefined
+      ? defaultPricePerCredit
+      : input.pricePerCredit
   const creditAmount = credits * pricePerCredit
   const whiteGloveAmount = input.whiteGlove ? creditAmount * whiteGloveRate : 0
 

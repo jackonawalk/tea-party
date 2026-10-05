@@ -20,6 +20,7 @@ export type SavedRow = {
 }
 
 export const defaultQuoteTitle = "Pricing calculator"
+export const defaultPricePerCreditText = "500"
 
 export type SavedForm = {
   title: string
@@ -30,6 +31,7 @@ export type SavedForm = {
   nextProjectId: number
   nextAutomationId: number
   whiteGlove: boolean
+  pricePerCredit: string
 }
 
 const optionalKeys = ["description", "diagram", "bubbleColor"] as const
@@ -292,6 +294,14 @@ export function parseSavedForm(value: unknown): SavedForm | null {
     whiteGlove = value.whiteGlove
   }
 
+  let pricePerCredit = defaultPricePerCreditText
+  if (value.pricePerCredit !== undefined) {
+    if (typeof value.pricePerCredit !== "string") {
+      return null
+    }
+    pricePerCredit = value.pricePerCredit.slice(0, 20)
+  }
+
   let title = defaultQuoteTitle
   if (value.title !== undefined) {
     if (typeof value.title !== "string") {
@@ -309,5 +319,6 @@ export function parseSavedForm(value: unknown): SavedForm | null {
     nextProjectId,
     nextAutomationId,
     whiteGlove,
+    pricePerCredit,
   }
 }

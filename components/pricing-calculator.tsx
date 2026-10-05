@@ -15,7 +15,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { priceUsage } from "@/lib/pricing";
-import { defaultQuoteTitle, type SavedForm } from "@/lib/saved-form";
+import {
+  defaultPricePerCreditText,
+  defaultQuoteTitle,
+  type SavedForm,
+} from "@/lib/saved-form";
 import { MermaidDiagram } from "@/components/mermaid-diagram";
 import { toSavedForm, useAutosave } from "@/components/use-autosave";
 import {
@@ -457,6 +461,7 @@ const starterForm = toSavedForm(
   starterProjects.length + 1,
   starterAutomations.length + 1,
   false,
+  defaultPricePerCreditText,
 );
 
 export function PricingCalculator({
@@ -476,6 +481,9 @@ export function PricingCalculator({
   );
   const [whiteGlove, setWhiteGlove] = useState(
     initialForm ? initialForm.whiteGlove : false,
+  );
+  const [pricePerCredit, setPricePerCredit] = useState(
+    initialForm ? initialForm.pricePerCredit : defaultPricePerCreditText,
   );
   const sourcesRef = useRef(sources);
   const focusNameId = useRef<string | null>(null);
@@ -551,6 +559,7 @@ export function PricingCalculator({
       recordsInMillions: parseCount(automation.records),
     })),
     whiteGlove,
+    pricePerCredit: parseCount(pricePerCredit),
   });
 
   useAutosave({
@@ -563,6 +572,7 @@ export function PricingCalculator({
     nextProjectId,
     nextAutomationId,
     whiteGlove,
+    pricePerCredit,
     starterForm,
   });
 
@@ -760,9 +770,26 @@ export function PricingCalculator({
                 <span className="block font-medium tabular-nums">
                   {countFormat.format(estimate.credits)}
                 </span>
-                <span className="block text-muted-foreground tabular-nums">
-                  {moneyFormat.format(estimate.creditAmount)}
-                </span>
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <dt className="text-muted-foreground">
+                <Label htmlFor="price-per-credit" className="font-normal">
+                  Price per credit
+                </Label>
+              </dt>
+              <dd className="flex items-baseline justify-end font-medium tabular-nums">
+                <span aria-hidden="true">$</span>
+                <Input
+                  id="price-per-credit"
+                  inputMode="decimal"
+                  value={pricePerCredit}
+                  placeholder="0"
+                  className="field-sizing-content h-auto w-auto min-w-[1ch] rounded-none border-0 bg-transparent p-0 text-right text-sm font-medium tabular-nums shadow-none outline-none hover:underline focus-visible:underline focus-visible:ring-0 dark:bg-transparent"
+                  onChange={(event) => {
+                    setPricePerCredit(decimalInput(event.target.value));
+                  }}
+                />
               </dd>
             </div>
             <div className="flex items-start justify-between gap-4">

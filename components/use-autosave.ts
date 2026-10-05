@@ -44,6 +44,7 @@ export function toSavedForm(
   nextProjectId: number,
   nextAutomationId: number,
   whiteGlove: boolean,
+  pricePerCredit: string,
 ): SavedForm {
   return {
     title,
@@ -54,6 +55,7 @@ export function toSavedForm(
     nextProjectId,
     nextAutomationId,
     whiteGlove,
+    pricePerCredit,
   };
 }
 
@@ -71,6 +73,7 @@ export function useAutosave({
   nextProjectId,
   nextAutomationId,
   whiteGlove,
+  pricePerCredit,
   starterForm,
 }: {
   quoteId?: string;
@@ -82,6 +85,7 @@ export function useAutosave({
   nextProjectId: number;
   nextAutomationId: number;
   whiteGlove: boolean;
+  pricePerCredit: string;
   starterForm: SavedForm;
 }) {
   const quoteIdRef = useRef(quoteId ? quoteId : "");
@@ -100,6 +104,7 @@ export function useAutosave({
       nextProjectId,
       nextAutomationId,
       whiteGlove,
+      pricePerCredit,
     );
     latestForm.current = form;
     if (saveTimer.current !== null) {
@@ -189,6 +194,7 @@ export function useAutosave({
     nextProjectId,
     nextAutomationId,
     whiteGlove,
+    pricePerCredit,
     title,
     starterForm,
   ]);
