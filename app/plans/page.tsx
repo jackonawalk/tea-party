@@ -25,6 +25,13 @@ function actionsLabel(actions: number) {
   return `${actions / 1000}k`;
 }
 
+function projectRecordsLabel(millions: number) {
+  if (millions >= 1) {
+    return `${countFormat.format(millions)}M`;
+  }
+  return `${countFormat.format(millions * 1000)}k`;
+}
+
 const limitRows: {
   label: string;
   note?: string;
@@ -38,7 +45,7 @@ const limitRows: {
   {
     label: "Projects",
     note: "records",
-    value: (plan) => `${countFormat.format(plan.upToProjectRecords * 1000)}k`,
+    value: (plan) => projectRecordsLabel(plan.upToProjectRecords),
   },
   {
     label: "Workflows",
@@ -67,39 +74,85 @@ const securityRows = [
 ];
 
 const groupHeaderClass =
-  "bg-muted/50 px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground";
+  "bg-muted px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground";
 
-const rowHeaderClass = "px-4 py-4 text-left font-normal text-muted-foreground";
+const rowHeaderClass =
+  "sticky left-0 bg-background px-4 py-4 text-left font-normal text-muted-foreground";
 
-export default function PlansPage() {
+const planColumnClass = "min-w-36 px-4 py-4";
+
+export default async function PlansPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ billing?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const billing = Array.isArray(params.billing)
+    ? params.billing[0]
+    : params.billing;
+  const annual = billing !== "monthly";
+
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-10 sm:px-6">
-      <header className="mb-8 max-w-xl">
-        <h1 className="text-2xl font-medium tracking-tight">Plans</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Monthly pricing for each plan, with the most each plan includes.
-        </p>
+    <main className="mx-auto flex w-full max-w-none flex-1 flex-col px-4 py-10 sm:px-6">
+      <header className="mb-8 flex max-w-xl flex-col gap-4">
+        <div>
+          <h1 className="text-2xl font-medium tracking-tight">Plans</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {annual
+              ? "Annual pricing for each plan, with two months free."
+              : "Monthly pricing for each plan, with the most each plan includes."}
+          </p>
+        </div>
+        <div className="flex w-fit rounded-lg border p-0.5 text-sm">
+          <a
+            href="/plans"
+            aria-current={annual ? "page" : undefined}
+            className={
+              annual
+                ? "rounded-md bg-foreground px-3 py-1 text-background"
+                : "rounded-md px-3 py-1 text-muted-foreground"
+            }
+          >
+            Annual
+          </a>
+          <a
+            href="/plans?billing=monthly"
+            aria-current={annual ? undefined : "page"}
+            className={
+              annual
+                ? "rounded-md px-3 py-1 text-muted-foreground"
+                : "rounded-md bg-foreground px-3 py-1 text-background"
+            }
+          >
+            Monthly
+          </a>
+        </div>
       </header>
       <div className="overflow-x-auto rounded-xl border">
-        <table className="w-full min-w-[40rem] border-collapse text-sm">
+        <table className="w-full border-collapse text-sm">
           <caption className="sr-only">Plan prices and limits</caption>
           <thead>
             <tr className="border-b">
-              <th className="px-4 py-3 text-left font-medium" scope="col">
+              <th
+                className="sticky left-0 bg-background px-4 py-3 text-left font-medium"
+                scope="col"
+              >
                 <span className="sr-only">Plan</span>
               </th>
               {plans.map((plan) => (
                 <th
                   key={plan.name}
-                  className="px-4 py-3 text-left font-medium"
+                  className="min-w-36 px-4 py-3 text-left font-medium"
                   scope="col"
                 >
                   {plan.name}
-                  <span className="mt-1 block text-muted-foreground">
+                  <span className="mt-1 block font-normal text-muted-foreground">
                     <span className="tabular-nums">
-                      {moneyFormat.format(plan.price)}
+                      {moneyFormat.format(
+                        annual ? plan.annualMonthlyPrice : plan.price,
+                      )}
                     </span>{" "}
-                    per month
+                    {annual ? "billed annually" : "per month"}
                   </span>
                 </th>
               ))}
@@ -111,19 +164,43 @@ export default function PlansPage() {
                 Credits
               </th>
               {plans.map((plan) => (
-                <td key={plan.name} className="px-4 py-4 tabular-nums">
-                  {plan.credits}
+                <td
+                  key={plan.name}
+                  className={`${planColumnClass} tabular-nums`}
+                >
+                  {countFormat.format(plan.annualCredits)}
+                  <span className="ml-1.5 text-xs text-muted-foreground">
+                    per year
+                  </span>
+                </td>
+              ))}
+            </tr>
+            <tr className="border-t">
+              <th className={rowHeaderClass} scope="row">
+                Price per credit
+              </th>
+              {plans.map((plan) => (
+                <td
+                  key={plan.name}
+                  className={`${planColumnClass} tabular-nums`}
+                >
+                  {moneyFormat.format(
+                    (annual ? plan.annualMonthlyPrice : plan.price) /
+                      plan.credits,
+                  )}
                 </td>
               ))}
             </tr>
             <tr className="border-t">
               <th
-                className={groupHeaderClass}
-                colSpan={plans.length + 1}
+                className={`${groupHeaderClass} sticky left-0`}
                 scope="colgroup"
               >
                 Usage
               </th>
+              {plans.map((plan) => (
+                <th key={plan.name} className={groupHeaderClass} />
+              ))}
             </tr>
             {limitRows.map((row) => (
               <tr key={row.label} className="border-t">
@@ -131,7 +208,10 @@ export default function PlansPage() {
                   {row.label}
                 </th>
                 {plans.map((plan) => (
-                  <td key={plan.name} className="px-4 py-4 tabular-nums">
+                  <td
+                    key={plan.name}
+                    className={`${planColumnClass} tabular-nums`}
+                  >
                     {row.value(plan)}
                     {row.note && (
                       <span className="ml-1.5 text-xs text-muted-foreground">
@@ -144,12 +224,14 @@ export default function PlansPage() {
             ))}
             <tr className="border-t">
               <th
-                className={groupHeaderClass}
-                colSpan={plans.length + 1}
+                className={`${groupHeaderClass} sticky left-0`}
                 scope="colgroup"
               >
                 Integrations
               </th>
+              {plans.map((plan) => (
+                <th key={plan.name} className={groupHeaderClass} />
+              ))}
             </tr>
             {integrationRows.map((label) => (
               <tr key={label} className="border-t">
@@ -157,9 +239,9 @@ export default function PlansPage() {
                   {label}
                 </th>
                 {plans.map((plan) => (
-                  <td key={plan.name} className="px-4 py-4">
+                  <td key={plan.name} className={planColumnClass}>
                     {label === "Custom" ? (
-                      plan.name === "Scale" || plan.name === "Enterprise" ? (
+                      plan.customAddOn ? (
                         <span className="text-muted-foreground">Add-on</span>
                       ) : null
                     ) : plan.integrations.includes(label) ? (
@@ -173,12 +255,14 @@ export default function PlansPage() {
             ))}
             <tr className="border-t">
               <th
-                className={groupHeaderClass}
-                colSpan={plans.length + 1}
+                className={`${groupHeaderClass} sticky left-0`}
                 scope="colgroup"
               >
                 Security
               </th>
+              {plans.map((plan) => (
+                <th key={plan.name} className={groupHeaderClass} />
+              ))}
             </tr>
             {securityRows.map((row) => (
               <tr key={row.label} className="border-t">
@@ -186,7 +270,7 @@ export default function PlansPage() {
                   {row.label}
                 </th>
                 {plans.map((plan, index) => (
-                  <td key={plan.name} className="px-4 py-4">
+                  <td key={plan.name} className={planColumnClass}>
                     {index >= row.fromPlan ? (
                       <Check className="size-4" aria-label="Included" />
                     ) : (

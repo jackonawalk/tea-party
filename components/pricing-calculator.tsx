@@ -15,6 +15,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { priceUsage } from "@/lib/pricing";
+import { suggestPlan } from "@/lib/plans";
 import {
   defaultPricePerCreditText,
   defaultQuoteTitle,
@@ -288,20 +289,22 @@ function DiagramBlock({
   );
 }
 
-function EstimateHint({ label, hint }: { label: string; hint: string }) {
+function EstimateHint({ label, hint }: { label: string; hint?: string }) {
   return (
     <dt className="flex items-center gap-1 text-muted-foreground">
       {label}
-      <Tooltip>
-        <TooltipTrigger
-          type="button"
-          aria-label={`About ${label}`}
-          className="text-muted-foreground"
-        >
-          <Info className="size-3.5" />
-        </TooltipTrigger>
-        <TooltipContent>{hint}</TooltipContent>
-      </Tooltip>
+      {hint ? (
+        <Tooltip>
+          <TooltipTrigger
+            type="button"
+            aria-label={`About ${label}`}
+            className="text-muted-foreground"
+          >
+            <Info className="size-3.5" />
+          </TooltipTrigger>
+          <TooltipContent>{hint}</TooltipContent>
+        </Tooltip>
+      ) : null}
     </dt>
   );
 }
@@ -479,10 +482,8 @@ export function PricingCalculator({
   const [nextSourceId, setNextSourceId] = useState(
     initialForm ? initialForm.nextSourceId : starterSources.length + 1,
   );
-  const [whiteGlove, setWhiteGlove] = useState(
-    initialForm ? initialForm.whiteGlove : false,
-  );
-  const [pricePerCredit, setPricePerCredit] = useState(
+  const [whiteGlove] = useState(initialForm ? initialForm.whiteGlove : false);
+  const [pricePerCredit] = useState(
     initialForm ? initialForm.pricePerCredit : defaultPricePerCreditText,
   );
   const sourcesRef = useRef(sources);
@@ -561,6 +562,8 @@ export function PricingCalculator({
     whiteGlove,
     pricePerCredit: parseCount(pricePerCredit),
   });
+
+  const suggestedPlan = suggestPlan(estimate.credits);
 
   useAutosave({
     quoteId,
@@ -733,108 +736,73 @@ export function PricingCalculator({
         />
       </form>
 
-      <Card className="lg:sticky lg:top-6">
-        <CardHeader>
-          <CardTitle>Estimate</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <dl className="flex flex-col gap-4">
-            <div className="flex items-start justify-between gap-4">
-              <EstimateHint
-                label="Sources"
-                hint="The records stored in each data source."
-              />
-              <dd className="text-right">
-                <span className="block font-medium tabular-nums">
-                  {countFormat.format(estimate.sourceRecords)}
-                </span>
-              </dd>
-            </div>
-            <div className="flex items-start justify-between gap-4">
-              <EstimateHint
-                label="Projects"
-                hint="Projects refresh hourly but are metered daily. Multiply each project's daily usage by 30 to estimate monthly usage."
-              />
-              <dd className="text-right">
-                <span className="block font-medium tabular-nums">
-                  {countFormat.format(estimate.projectRecords)}
-                </span>
-              </dd>
-            </div>
-            <div className="flex items-start justify-between gap-4">
-              <EstimateHint
-                label="Credits used"
-                hint={`One credit is 1M Records`}
-              />
-              <dd className="text-right">
-                <span className="block font-medium tabular-nums">
-                  {countFormat.format(estimate.credits)}
-                </span>
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-muted-foreground">
-                <Label htmlFor="price-per-credit" className="font-normal">
-                  Price per credit
-                </Label>
-              </dt>
-              <dd className="flex items-baseline justify-end font-medium tabular-nums">
-                <span aria-hidden="true">$</span>
-                <Input
-                  id="price-per-credit"
-                  inputMode="decimal"
-                  value={pricePerCredit}
-                  placeholder="0"
-                  className="field-sizing-content h-auto w-auto min-w-[1ch] rounded-none border-0 bg-transparent p-0 text-right text-sm font-medium tabular-nums shadow-none outline-none hover:underline focus-visible:underline focus-visible:ring-0 dark:bg-transparent"
-                  onChange={(event) => {
-                    setPricePerCredit(decimalInput(event.target.value));
-                  }}
+      <div className="flex flex-col gap-6 lg:sticky lg:top-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Monthly Usage</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <dl className="flex flex-col gap-4">
+              <div className="flex items-start justify-between gap-4">
+                <EstimateHint
+                  label="Sources"
+                  hint="Total records across all sources."
                 />
-              </dd>
-            </div>
-            <div className="flex items-start justify-between gap-4">
-              <EstimateHint
-                label="Automations"
-                hint="Automations are not billed yet and do not count toward credits."
-              />
-              <dd className="text-right">
-                <span className="block font-medium tabular-nums">
-                  {countFormat.format(estimate.automationRecords)}
-                </span>
-              </dd>
-            </div>
-          </dl>
-          <label className="flex items-start justify-between gap-4 border-t pt-4 text-sm">
-            <span className="flex items-start gap-2">
-              <input
-                type="checkbox"
-                className="mt-0.5 size-4 accent-foreground"
-                checked={whiteGlove}
-                onChange={(event) => {
-                  setWhiteGlove(event.target.checked);
-                }}
-              />
-              <span>
-                Add white-glove support plan
-                <span className="mt-1 block font-normal text-muted-foreground">
-                  20% of spend
-                </span>
-              </span>
-            </span>
-            {whiteGlove ? (
-              <span className="font-medium tabular-nums">
-                {moneyFormat.format(estimate.whiteGloveAmount)}
-              </span>
-            ) : null}
-          </label>
-          <div className="flex items-baseline justify-between gap-4 border-t pt-4">
-            <p className="text-muted-foreground">Monthly total</p>
-            <p className="text-base font-medium tabular-nums">
-              {moneyFormat.format(estimate.monthlyTotal)}
+                <dd className="text-right">
+                  <span className="block font-medium tabular-nums">
+                    {countFormat.format(estimate.sourceRecords)}
+                  </span>
+                </dd>
+              </div>
+              <div className="flex items-start justify-between gap-4">
+                <EstimateHint
+                  label="Projects"
+                  hint="Projects refresh hourly but are metered daily. Multiply each project's daily usage by 30 to estimate monthly usage."
+                />
+                <dd className="text-right">
+                  <span className="block font-medium tabular-nums">
+                    {countFormat.format(estimate.projectRecords)}
+                  </span>
+                </dd>
+              </div>
+              <div className="flex items-start justify-between gap-4">
+                <EstimateHint
+                  label="Credits Used"
+                  hint={`One credit is 1M Records`}
+                />
+                <dd className="text-right">
+                  <span className="block font-medium tabular-nums">
+                    {countFormat.format(estimate.credits)}
+                  </span>
+                </dd>
+              </div>
+              <div className="flex items-start justify-between gap-4">
+                <EstimateHint label="Automations" />
+                <dd className="text-right">
+                  <span className="block font-medium tabular-nums">
+                    {countFormat.format(estimate.automationRecords)}
+                  </span>
+                </dd>
+              </div>
+            </dl>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Suggested Plan</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1 text-left">
+            <p className="text-base font-medium">{suggestedPlan.name}</p>
+            <p className="font-medium tabular-nums">
+              {moneyFormat.format(suggestedPlan.annualPrice)}
+              <span className="font-normal text-muted-foreground"> / year</span>
             </p>
-          </div>
-        </CardContent>
-      </Card>
+            <span className="block font-normal text-muted-foreground">
+              Includes {countFormat.format(suggestedPlan.annualCredits)} credits
+            </span>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
