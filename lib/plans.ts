@@ -1,4 +1,4 @@
-import { priceUsage } from "@/lib/pricing"
+import { daysInMonth, priceUsage } from "@/lib/pricing"
 
 export type Plan = {
   integrations: string[]
@@ -17,19 +17,19 @@ export type Plan = {
   estimatedSpend: number
 }
 
-// Starter is the base, sized with the pricing calculator. Records are in
+// Actions keep a separate scale and do not spend credits. Records are in
 // millions and one action is one automation record.
 const starterPrice = 500
-const starterSyncedRows = .5
-const starterProjectRecords = 0.25
 const starterActions = 0.001
 
-// Annual billing is the monthly price with two months free.
 const monthsInYear = 12
-const annualMonthsFree = 2
 
-// Growth is 5 credits at twice Starter's mix, which is 0.4 of that mix per
-// credit. Scale and larger tiers keep that mix so limits rise with credits.
+// Half of a plan's monthly credits are suggested as sources, half as projects.
+// Projects are measured daily, so that half is spread across the month.
+const sourceCreditShare = 0.5
+
+// Growth is 5 credits at twice Starter's old action mix. Scale and larger
+// tiers keep that action scale.
 const growthCredits = 5
 const recordsPerCredit = 2 / growthCredits
 
@@ -46,7 +46,7 @@ type Tier = {
 const tiers: Tier[] = [
   { name: "Starter", credits: 1, price: 500, users: 3, integrations: ["Files", "SaaS"], customAddOn: false, limitsFromCredits: false },
   { name: "Growth", credits: 5, price: 1000, users: 10, integrations: ["SQL"], customAddOn: false, limitsFromCredits: false },
-  { name: "Scale", credits: 10, price: 1700, users: 15, integrations: ["ERPs", "Warehouses"], customAddOn: true, limitsFromCredits: true },
+  { name: "Scale", credits: 10, price: 1700, users: 15, integrations: ["ERPs", "BYOW"], customAddOn: true, limitsFromCredits: true },
   { name: "Enterprise", credits: 20, price: 3000, users: 25, integrations: [], customAddOn: true, limitsFromCredits: true },
   { name: "Volume 30", credits: 30, price: 4200, users: 35, integrations: [], customAddOn: true, limitsFromCredits: true },
   { name: "Volume 40", credits: 40, price: 5200, users: 50, integrations: [], customAddOn: true, limitsFromCredits: true },
@@ -60,8 +60,9 @@ function planFor(tier: Tier, index: number): Plan {
   const scale = tier.limitsFromCredits
     ? tier.credits * recordsPerCredit
     : tier.price / starterPrice
-  const syncedRows = starterSyncedRows * scale
-  const projectRecords = starterProjectRecords * scale
+  const syncedRows = tier.credits * sourceCreditShare
+  const projectRecords =
+    (tier.credits * (1 - sourceCreditShare)) / daysInMonth
   const actions = starterActions * scale
 
   const priced = priceUsage({
@@ -71,7 +72,7 @@ function planFor(tier: Tier, index: number): Plan {
     whiteGlove: false,
   })
 
-  const annualPrice = tier.price * (monthsInYear - annualMonthsFree)
+  const annualPrice = tier.price * monthsInYear
 
   return {
     name: tier.name,

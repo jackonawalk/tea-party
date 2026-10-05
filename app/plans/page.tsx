@@ -26,10 +26,14 @@ function actionsLabel(actions: number) {
 }
 
 function projectRecordsLabel(millions: number) {
+  // Floor the label. Rounding up can push the example into the next plan
+  // when those records are entered in the calculator.
   if (millions >= 1) {
-    return `${countFormat.format(millions)}M`;
+    const shown = Math.floor(millions * 1000) / 1000;
+    return `${countFormat.format(shown)}M`;
   }
-  return `${countFormat.format(millions * 1000)}k`;
+  const thousands = Math.floor(millions * 10000) / 10;
+  return `${countFormat.format(thousands)}k`;
 }
 
 const limitRows: {
@@ -48,22 +52,15 @@ const limitRows: {
     value: (plan) => projectRecordsLabel(plan.upToProjectRecords),
   },
   {
-    label: "Workflows",
+    label: "Automations",
     note: "actions",
     value: (plan) => actionsLabel(plan.actionsPerMonth),
   },
-  { label: "Users", value: (plan) => countFormat.format(plan.upToUsers) },
+  { label: "Users", value: () => "Unlimited" },
   { label: "LLM tokens", value: () => "Unlimited" },
 ];
 
-const integrationRows = [
-  "Files",
-  "SaaS",
-  "SQL",
-  "Warehouses",
-  "ERPs",
-  "Custom",
-];
+const integrationRows = ["Files", "SaaS", "SQL", "BYOW", "ERPs", "Custom"];
 
 // fromPlan is the index of the first plan that includes the feature.
 const securityRows = [
@@ -81,52 +78,16 @@ const rowHeaderClass =
 
 const planColumnClass = "min-w-36 px-4 py-4";
 
-export default async function PlansPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ billing?: string | string[] }>;
-}) {
-  const params = await searchParams;
-  const billing = Array.isArray(params.billing)
-    ? params.billing[0]
-    : params.billing;
-  const annual = billing !== "monthly";
+const visiblePlans = plans.slice(0, 4);
 
+export default function PlansPage() {
   return (
-    <main className="mx-auto flex w-full max-w-none flex-1 flex-col px-4 py-10 sm:px-6">
-      <header className="mb-8 flex max-w-xl flex-col gap-4">
-        <div>
-          <h1 className="text-2xl font-medium tracking-tight">Plans</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {annual
-              ? "Annual pricing for each plan, with two months free."
-              : "Monthly pricing for each plan, with the most each plan includes."}
-          </p>
-        </div>
-        <div className="flex w-fit rounded-lg border p-0.5 text-sm">
-          <a
-            href="/plans"
-            aria-current={annual ? "page" : undefined}
-            className={
-              annual
-                ? "rounded-md bg-foreground px-3 py-1 text-background"
-                : "rounded-md px-3 py-1 text-muted-foreground"
-            }
-          >
-            Annual
-          </a>
-          <a
-            href="/plans?billing=monthly"
-            aria-current={annual ? undefined : "page"}
-            className={
-              annual
-                ? "rounded-md px-3 py-1 text-muted-foreground"
-                : "rounded-md bg-foreground px-3 py-1 text-background"
-            }
-          >
-            Monthly
-          </a>
-        </div>
+    <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 py-10 sm:px-6">
+      <header className="mb-8">
+        <h1 className="text-2xl font-medium tracking-tight">Plans</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Annual pricing for each plan.
+        </p>
       </header>
       <div className="overflow-x-auto rounded-xl border">
         <table className="w-full border-collapse text-sm">
@@ -139,7 +100,7 @@ export default async function PlansPage({
               >
                 <span className="sr-only">Plan</span>
               </th>
-              {plans.map((plan) => (
+              {visiblePlans.map((plan) => (
                 <th
                   key={plan.name}
                   className="min-w-36 px-4 py-3 text-left font-medium"
@@ -148,11 +109,9 @@ export default async function PlansPage({
                   {plan.name}
                   <span className="mt-1 block font-normal text-muted-foreground">
                     <span className="tabular-nums">
-                      {moneyFormat.format(
-                        annual ? plan.annualMonthlyPrice : plan.price,
-                      )}
+                      {moneyFormat.format(plan.annualPrice)}
                     </span>{" "}
-                    {annual ? "billed annually" : "per month"}
+                    per year
                   </span>
                 </th>
               ))}
@@ -163,15 +122,12 @@ export default async function PlansPage({
               <th className={rowHeaderClass} scope="row">
                 Credits
               </th>
-              {plans.map((plan) => (
+              {visiblePlans.map((plan) => (
                 <td
                   key={plan.name}
                   className={`${planColumnClass} tabular-nums`}
                 >
                   {countFormat.format(plan.annualCredits)}
-                  <span className="ml-1.5 text-xs text-muted-foreground">
-                    per year
-                  </span>
                 </td>
               ))}
             </tr>
@@ -179,15 +135,12 @@ export default async function PlansPage({
               <th className={rowHeaderClass} scope="row">
                 Price per credit
               </th>
-              {plans.map((plan) => (
+              {visiblePlans.map((plan) => (
                 <td
                   key={plan.name}
                   className={`${planColumnClass} tabular-nums`}
                 >
-                  {moneyFormat.format(
-                    (annual ? plan.annualMonthlyPrice : plan.price) /
-                      plan.credits,
-                  )}
+                  {moneyFormat.format(plan.annualPrice / plan.annualCredits)}
                 </td>
               ))}
             </tr>
@@ -196,9 +149,9 @@ export default async function PlansPage({
                 className={`${groupHeaderClass} sticky left-0`}
                 scope="colgroup"
               >
-                Usage
+                Monthly Usage
               </th>
-              {plans.map((plan) => (
+              {visiblePlans.map((plan) => (
                 <th key={plan.name} className={groupHeaderClass} />
               ))}
             </tr>
@@ -207,7 +160,7 @@ export default async function PlansPage({
                 <th className={rowHeaderClass} scope="row">
                   {row.label}
                 </th>
-                {plans.map((plan) => (
+                {visiblePlans.map((plan) => (
                   <td
                     key={plan.name}
                     className={`${planColumnClass} tabular-nums`}
@@ -227,9 +180,9 @@ export default async function PlansPage({
                 className={`${groupHeaderClass} sticky left-0`}
                 scope="colgroup"
               >
-                Integrations
+                Data Sources
               </th>
-              {plans.map((plan) => (
+              {visiblePlans.map((plan) => (
                 <th key={plan.name} className={groupHeaderClass} />
               ))}
             </tr>
@@ -238,7 +191,7 @@ export default async function PlansPage({
                 <th className={rowHeaderClass} scope="row">
                   {label}
                 </th>
-                {plans.map((plan) => (
+                {visiblePlans.map((plan) => (
                   <td key={plan.name} className={planColumnClass}>
                     {label === "Custom" ? (
                       plan.customAddOn ? (
@@ -260,7 +213,7 @@ export default async function PlansPage({
               >
                 Security
               </th>
-              {plans.map((plan) => (
+              {visiblePlans.map((plan) => (
                 <th key={plan.name} className={groupHeaderClass} />
               ))}
             </tr>
@@ -269,7 +222,7 @@ export default async function PlansPage({
                 <th className={rowHeaderClass} scope="row">
                   {row.label}
                 </th>
-                {plans.map((plan, index) => (
+                {visiblePlans.map((plan, index) => (
                   <td key={plan.name} className={planColumnClass}>
                     {index >= row.fromPlan ? (
                       <Check className="size-4" aria-label="Included" />
