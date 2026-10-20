@@ -37,19 +37,25 @@ type Tier = {
   customAddOn: boolean
 }
 
-// Monthly prices follow 500 × credits^0.5, rounded to the nearest $50, so
-// each added credit costs less than the one before it.
+// Monthly price after Scale is 1,900 × (credits / 8)^0.256, rounded to the
+// nearest $50, so each added credit costs less than the one before it.
+// Enterprise 12 is 350 credits at $60,000 a year.
 const tiers: Tier[] = [
   { name: "Starter", credits: 1, price: 500, users: 3, integrations: ["Files", "SaaS"], customAddOn: false },
-  { name: "Growth", credits: 2, price: 700, users: 10, integrations: ["SQL"], customAddOn: false },
-  { name: "Scale", credits: 3, price: 850, users: 15, integrations: ["ERPs", "BYOW"], customAddOn: true },
-  { name: "Enterprise Bronze", credits: 5, price: 1100, users: 25, integrations: [], customAddOn: true },
-  { name: "Enterprise Silver", credits: 8, price: 1400, users: 35, integrations: [], customAddOn: true },
-  { name: "Enterprise Gold", credits: 12, price: 1750, users: 50, integrations: [], customAddOn: true },
-  { name: "Enterprise 4", credits: 20, price: 2250, users: 65, integrations: [], customAddOn: true },
-  { name: "Enterprise 5", credits: 35, price: 2950, users: 80, integrations: [], customAddOn: true },
-  { name: "Enterprise 6", credits: 60, price: 3850, users: 100, integrations: [], customAddOn: true },
-  { name: "Enterprise 7", credits: 100, price: 5000, users: 150, integrations: [], customAddOn: true },
+  { name: "Growth", credits: 3, price: 1000, users: 10, integrations: ["SQL"], customAddOn: false },
+  { name: "Scale", credits: 5, price: 1400, users: 15, integrations: ["ERPs", "BYOW"], customAddOn: true },
+  { name: "Enterprise Bronze", credits: 8, price: 1900, users: 25, integrations: [], customAddOn: true },
+  { name: "Enterprise Silver", credits: 12, price: 2100, users: 35, integrations: [], customAddOn: true },
+  { name: "Enterprise Gold", credits: 18, price: 2350, users: 50, integrations: [], customAddOn: true },
+  { name: "Enterprise 4", credits: 25, price: 2550, users: 55, integrations: [], customAddOn: true },
+  { name: "Enterprise 5", credits: 35, price: 2750, users: 60, integrations: [], customAddOn: true },
+  { name: "Enterprise 6", credits: 50, price: 3050, users: 70, integrations: [], customAddOn: true },
+  { name: "Enterprise 7", credits: 70, price: 3300, users: 75, integrations: [], customAddOn: true },
+  { name: "Enterprise 8", credits: 100, price: 3650, users: 85, integrations: [], customAddOn: true },
+  { name: "Enterprise 9", credits: 140, price: 3950, users: 95, integrations: [], customAddOn: true },
+  { name: "Enterprise 10", credits: 200, price: 4350, users: 100, integrations: [], customAddOn: true },
+  { name: "Enterprise 11", credits: 280, price: 4700, users: 110, integrations: [], customAddOn: true },
+  { name: "Enterprise 12", credits: 350, price: 5000, users: 120, integrations: [], customAddOn: true },
 ]
 
 function planFor(tier: Tier, index: number): Plan {
