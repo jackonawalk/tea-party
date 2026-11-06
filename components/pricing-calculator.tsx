@@ -11,6 +11,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { SiteFooter } from "@/components/site-footer";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -54,18 +55,13 @@ type SourceOption = {
 
 const appsUrl = "https://app.askgrapple.com/api/public/apps";
 
+const sourcePlaceholder = "Select a data source";
+
 const starterSources: NamedRow[] = [
   {
     id: "source-1",
-    name: "Salesforce",
-    placeholder: "Source name",
-    records: "",
-  },
-  { id: "source-2", name: "Stripe", placeholder: "Source name", records: "" },
-  {
-    id: "source-3",
-    name: "Quickbooks",
-    placeholder: "Source name",
+    name: "",
+    placeholder: sourcePlaceholder,
     records: "",
   },
 ];
@@ -650,7 +646,7 @@ export function PricingCalculator({
       blank = {
         id: blankId,
         name: "",
-        placeholder: "Source name",
+        placeholder: sourcePlaceholder,
         records: "",
       };
     }
@@ -683,7 +679,7 @@ export function PricingCalculator({
     setSources((current) => {
       const next = [
         ...current,
-        { id, name: "", placeholder: "Source name", records: "" },
+        { id, name: "", placeholder: sourcePlaceholder, records: "" },
       ];
       sourcesRef.current = next;
       return next;
@@ -700,11 +696,7 @@ export function PricingCalculator({
             event.preventDefault();
           }}
         >
-          <Accordion
-            multiple
-            defaultValue={["sources", "project", "automation"]}
-            className="gap-4"
-          >
+          <Accordion multiple defaultValue={["sources"]} className="gap-4">
             <AccordionItem value="sources" className={sectionItemClass}>
               <AccordionTrigger className={sectionTriggerClass}>
                 <SectionHeading
@@ -808,6 +800,7 @@ export function PricingCalculator({
             />
           </Accordion>
         </form>
+        <SiteFooter />
       </div>
 
       <div className="flex flex-col gap-6 lg:sticky lg:top-6">

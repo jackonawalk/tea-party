@@ -1,4 +1,9 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 const faqs = [
   {
@@ -28,24 +33,25 @@ const faqs = [
 
 export function SiteFooter() {
   return (
-    <footer className="mt-16">
-      <div className="mx-auto w-full max-w-3xl px-4 pb-10 sm:px-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>FAQ</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <dl className="flex flex-col gap-6">
-              {faqs.map((faq) => (
-                <div key={faq.question}>
-                  <dt className="font-medium">{faq.question}</dt>
-                  <dd className="mt-1 text-muted-foreground">{faq.answer}</dd>
-                </div>
-              ))}
-            </dl>
-          </CardContent>
-        </Card>
-      </div>
-    </footer>
+    <Accordion>
+      <AccordionItem
+        value="faq"
+        className="rounded-xl border-b-0 bg-card px-3 ring-1 ring-foreground/10"
+      >
+        <AccordionTrigger className="px-0 py-3 text-base hover:no-underline">
+          FAQ
+        </AccordionTrigger>
+        <AccordionContent>
+          <dl className="flex flex-col gap-6">
+            {faqs.map((faq) => (
+              <div key={faq.question}>
+                <dt className="font-medium">{faq.question}</dt>
+                <dd className="mt-1 text-muted-foreground">{faq.answer}</dd>
+              </div>
+            ))}
+          </dl>
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
   );
 }
