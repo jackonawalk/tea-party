@@ -6,6 +6,15 @@ import { PricingCalculator } from "@/components/pricing-calculator";
 import { buttonVariants } from "@/components/ui/button";
 import { defaultQuoteTitle, type SavedForm } from "@/lib/saved-form";
 
+const creditRows = [
+  { label: "Creating new projects", free: false },
+  { label: "Syncing more data", free: false },
+  { label: "Editing a project", free: true },
+  { label: "Unlimited data updates", free: true },
+  { label: "Data visualizations", free: true },
+  { label: "MCP and API", free: true },
+];
+
 export function CalculatorScreen({
   quoteId,
   initialForm,
@@ -39,8 +48,7 @@ export function CalculatorScreen({
             />
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Enter records for each data source, name each project, and name each
-            automation.
+            Build an estimate based on your data, sources, and workflows.
           </p>
         </header>
         <a
@@ -57,7 +65,61 @@ export function CalculatorScreen({
         quoteId={quoteId}
         initialForm={initialForm}
         title={title}
-      />
+      >
+        <div className="overflow-x-auto rounded-xl border">
+          <table className="w-full border-collapse text-sm">
+            <caption className="sr-only">What counts as a credit</caption>
+            <thead>
+              <tr className="border-b">
+                <th className="px-4 py-3 text-left font-medium" scope="col">
+                  Feature
+                </th>
+                <th
+                  className="px-4 py-3 text-center font-medium whitespace-nowrap"
+                  scope="col"
+                >
+                  Consumes credits
+                </th>
+                <th
+                  className="px-4 py-3 text-center font-medium whitespace-nowrap"
+                  scope="col"
+                >
+                  Included for free
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {creditRows.map((row) => (
+                <tr key={row.label} className="border-b last:border-b-0">
+                  <th className="px-4 py-3 text-left font-normal" scope="row">
+                    {row.label}
+                  </th>
+                  <td className="px-4 py-3 text-center">
+                    {row.free ? (
+                      <span className="sr-only">Does not consume credits</span>
+                    ) : (
+                      <span>
+                        <span aria-hidden="true">✅</span>
+                        <span className="sr-only">Consumes credits</span>
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {row.free ? (
+                      <span>
+                        <span aria-hidden="true">✅</span>
+                        <span className="sr-only">Included for free</span>
+                      </span>
+                    ) : (
+                      <span className="sr-only">Not included</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </PricingCalculator>
     </main>
   );
 }

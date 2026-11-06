@@ -1,12 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { GeneratedKind } from "@/lib/saved-form";
 import { Eye, EyeOff, Info, Trash2 } from "lucide-react";
 import CreatableSelect from "react-select/creatable";
 import type { StylesConfig } from "react-select";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -289,6 +301,26 @@ function DiagramBlock({
   );
 }
 
+const sectionItemClass =
+  "rounded-xl border-b-0 bg-card px-3 ring-1 ring-foreground/10";
+
+const sectionTriggerClass = "items-baseline px-0 py-3 hover:no-underline";
+
+function SectionHeading({
+  step,
+  description,
+}: {
+  step: number;
+  description: string;
+}) {
+  return (
+    <span className="flex items-baseline gap-2">
+      <span>{step}.</span>
+      <span className="font-normal">{description}</span>
+    </span>
+  );
+}
+
 function EstimateHint({ label, hint }: { label: string; hint?: string }) {
   return (
     <dt className="flex items-center gap-1 text-muted-foreground">
@@ -372,86 +404,100 @@ function GeneratedRowList({
   const copy = generatedCopy[kind];
 
   return (
-    <fieldset className="flex flex-col gap-4">
-      <legend className="sr-only text-sm font-medium">{copy.legend}</legend>
-      <div className="flex flex-col gap-3">
-        {rows.map((row) => {
-          const nameId = `${row.id}-name`;
-          const recordsId = `${row.id}-records`;
+    <AccordionItem value={kind} className={sectionItemClass}>
+      <AccordionTrigger className={sectionTriggerClass}>
+        <SectionHeading
+          step={kind === "project" ? 2 : 3}
+          description={
+            kind === "project"
+              ? "What projects do you want to build?"
+              : "What workflows do you want to automate?"
+          }
+        />
+      </AccordionTrigger>
+      <AccordionContent className="flex flex-col gap-4">
+        <fieldset className="flex flex-col gap-4">
+          <legend className="sr-only text-sm font-medium">{copy.legend}</legend>
+          <div className="flex flex-col gap-3">
+            {rows.map((row) => {
+              const nameId = `${row.id}-name`;
+              const recordsId = `${row.id}-records`;
 
-          return (
-            <div
-              key={row.id}
-              className="grid gap-3 rounded-xl border bg-card p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start"
-            >
-              <div className="flex flex-col gap-2">
-                <Label htmlFor={nameId}>{copy.label}</Label>
-                <div className="relative">
-                  <Input
-                    id={nameId}
-                    value={row.name}
-                    placeholder={row.generating ? "" : row.placeholder}
-                    readOnly={row.generating || row.revealing}
-                    aria-busy={row.generating}
-                    onChange={(event) => {
-                      onUpdate(kind, row.id, { name: event.target.value });
+              return (
+                <div
+                  key={row.id}
+                  className="grid gap-3 rounded-xl border bg-card p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start"
+                >
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor={nameId}>{copy.label}</Label>
+                    <div className="relative">
+                      <Input
+                        id={nameId}
+                        value={row.name}
+                        placeholder={row.generating ? "" : row.placeholder}
+                        readOnly={row.generating || row.revealing}
+                        aria-busy={row.generating}
+                        onChange={(event) => {
+                          onUpdate(kind, row.id, { name: event.target.value });
+                        }}
+                      />
+                      {row.generating ? (
+                        <GeneratingHint label={copy.generating} />
+                      ) : null}
+                    </div>
+                    {row.description ? (
+                      <GeneratedReply
+                        description={row.description}
+                        bubbleColor={row.bubbleColor}
+                      />
+                    ) : null}
+                  </div>
+                  <div className="flex items-end gap-3">
+                    <RecordsField
+                      id={recordsId}
+                      value={row.records}
+                      onChange={(records) => {
+                        onUpdate(kind, row.id, { records });
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Remove ${row.name || row.placeholder || kind}`}
+                      onClick={() => {
+                        onRemove(kind, row.id);
+                      }}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </div>
+                  <DiagramBlock
+                    diagram={row.diagram}
+                    generating={row.diagramGenerating}
+                    hidden={row.diagramHidden}
+                    onHiddenChange={(diagramHidden) => {
+                      onUpdate(kind, row.id, { diagramHidden });
                     }}
                   />
-                  {row.generating ? (
-                    <GeneratingHint label={copy.generating} />
-                  ) : null}
                 </div>
-                {row.description ? (
-                  <GeneratedReply
-                    description={row.description}
-                    bubbleColor={row.bubbleColor}
-                  />
-                ) : null}
-              </div>
-              <div className="flex items-end gap-3">
-                <RecordsField
-                  id={recordsId}
-                  value={row.records}
-                  onChange={(records) => {
-                    onUpdate(kind, row.id, { records });
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Remove ${row.name || row.placeholder || kind}`}
-                  onClick={() => {
-                    onRemove(kind, row.id);
-                  }}
-                >
-                  <Trash2 />
-                </Button>
-              </div>
-              <DiagramBlock
-                diagram={row.diagram}
-                generating={row.diagramGenerating}
-                hidden={row.diagramHidden}
-                onHiddenChange={(diagramHidden) => {
-                  onUpdate(kind, row.id, { diagramHidden });
-                }}
-              />
-            </div>
-          );
-        })}
-      </div>
-      <div>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => {
-            onAdd(kind);
-          }}
-        >
-          {copy.add}
-        </Button>
-      </div>
-    </fieldset>
+              );
+            })}
+          </div>
+          <div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                onAdd(kind);
+              }}
+            >
+              {copy.add}
+            </Button>
+          </div>
+        </fieldset>
+      </AccordionContent>
+    </AccordionItem>
   );
 }
 
@@ -471,10 +517,12 @@ export function PricingCalculator({
   quoteId,
   initialForm,
   title,
+  children,
 }: {
   quoteId?: string;
   initialForm?: SavedForm;
   title: string;
+  children?: ReactNode;
 }) {
   const [sources, setSources] = useState<NamedRow[]>(
     initialForm ? initialForm.sources : starterSources,
@@ -644,102 +692,128 @@ export function PricingCalculator({
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
-      <form
-        className="flex flex-col gap-8"
-        onSubmit={(event) => {
-          event.preventDefault();
-        }}
-      >
-        <fieldset className="flex flex-col gap-4">
-          <legend className="text-sm font-medium sr-only">Data sources</legend>
-          <p className="text-sm text-muted-foreground sr-only">
-            Enter how many records you have in each source.
-          </p>
-          <div className="flex flex-col gap-3">
-            {sources.map((source) => {
-              const nameId = `${source.id}-name`;
-              const recordsId = `${source.id}-records`;
-              const selectedSource = optionForName(sourceOptions, source.name);
+      <div className="flex min-w-0 flex-col gap-8">
+        {children}
+        <form
+          className="flex flex-col gap-8"
+          onSubmit={(event) => {
+            event.preventDefault();
+          }}
+        >
+          <Accordion
+            multiple
+            defaultValue={["sources", "project", "automation"]}
+            className="gap-4"
+          >
+            <AccordionItem value="sources" className={sectionItemClass}>
+              <AccordionTrigger className={sectionTriggerClass}>
+                <SectionHeading
+                  step={1}
+                  description="How much data do you need to sync?"
+                />
+              </AccordionTrigger>
+              <AccordionContent className="flex flex-col gap-4">
+                <fieldset className="flex flex-col gap-4">
+                  <legend className="text-sm font-medium sr-only">
+                    Data sources
+                  </legend>
+                  <p className="text-sm text-muted-foreground sr-only">
+                    Enter how many records you have in each source.
+                  </p>
+                  <div className="flex flex-col gap-3">
+                    {sources.map((source) => {
+                      const nameId = `${source.id}-name`;
+                      const recordsId = `${source.id}-records`;
+                      const selectedSource = optionForName(
+                        sourceOptions,
+                        source.name,
+                      );
 
-              return (
-                <div
-                  key={source.id}
-                  className="grid gap-3 rounded-xl border bg-card p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end"
-                >
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor={nameId}>Data Source</Label>
-                    <CreatableSelect<SourceOption, false>
-                      inputId={nameId}
-                      instanceId={nameId}
-                      options={sourceOptions}
-                      value={selectedSource}
-                      placeholder={source.placeholder}
-                      styles={sourceSelectStyles}
-                      formatCreateLabel={(inputValue) => `Use "${inputValue}"`}
-                      formatOptionLabel={(option) => (
-                        <span className="flex items-center gap-2">
-                          {option.logoUrl ? (
-                            <AppLogo src={option.logoUrl} />
-                          ) : null}
-                          <span>{option.label}</span>
-                        </span>
-                      )}
-                      onChange={(option) => {
-                        updateSource(source.id, {
-                          name: option ? option.label : "",
-                        });
-                      }}
-                    />
+                      return (
+                        <div
+                          key={source.id}
+                          className="grid gap-3 rounded-xl border bg-card p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end"
+                        >
+                          <div className="flex flex-col gap-2">
+                            <Label htmlFor={nameId}>Data Source</Label>
+                            <CreatableSelect<SourceOption, false>
+                              inputId={nameId}
+                              instanceId={nameId}
+                              options={sourceOptions}
+                              value={selectedSource}
+                              placeholder={source.placeholder}
+                              styles={sourceSelectStyles}
+                              formatCreateLabel={(inputValue) =>
+                                `Use "${inputValue}"`
+                              }
+                              formatOptionLabel={(option) => (
+                                <span className="flex items-center gap-2">
+                                  {option.logoUrl ? (
+                                    <AppLogo src={option.logoUrl} />
+                                  ) : null}
+                                  <span>{option.label}</span>
+                                </span>
+                              )}
+                              onChange={(option) => {
+                                updateSource(source.id, {
+                                  name: option ? option.label : "",
+                                });
+                              }}
+                            />
+                          </div>
+                          <RecordsField
+                            id={recordsId}
+                            value={source.records}
+                            onChange={(records) => {
+                              updateSource(source.id, { records });
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`Remove ${source.name || source.placeholder || "source"}`}
+                            onClick={() => {
+                              removeSource(source.id);
+                            }}
+                          >
+                            <Trash2 />
+                          </Button>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <RecordsField
-                    id={recordsId}
-                    value={source.records}
-                    onChange={(records) => {
-                      updateSource(source.id, { records });
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Remove ${source.name || source.placeholder || "source"}`}
-                    onClick={() => {
-                      removeSource(source.id);
-                    }}
-                  >
-                    <Trash2 />
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
-          <div>
-            <Button type="button" variant="outline" onClick={addSource}>
-              Add source
-            </Button>
-          </div>
-        </fieldset>
+                  <div>
+                    <Button type="button" variant="outline" onClick={addSource}>
+                      Add source
+                    </Button>
+                  </div>
+                </fieldset>
+              </AccordionContent>
+            </AccordionItem>
 
-        <GeneratedRowList
-          kind="project"
-          rows={projects}
-          onUpdate={updateRow}
-          onAdd={addRow}
-          onRemove={removeRow}
-        />
-        <GeneratedRowList
-          kind="automation"
-          rows={automations}
-          onUpdate={updateRow}
-          onAdd={addRow}
-          onRemove={removeRow}
-        />
-      </form>
+            <GeneratedRowList
+              kind="project"
+              rows={projects}
+              onUpdate={updateRow}
+              onAdd={addRow}
+              onRemove={removeRow}
+            />
+            <GeneratedRowList
+              kind="automation"
+              rows={automations}
+              onUpdate={updateRow}
+              onAdd={addRow}
+              onRemove={removeRow}
+            />
+          </Accordion>
+        </form>
+      </div>
 
       <div className="flex flex-col gap-6 lg:sticky lg:top-6">
         <Card>
           <CardHeader>
-            <CardTitle>Monthly Usage</CardTitle>
+            <CardTitle>Estimated Usage</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <dl className="flex flex-col gap-4">
@@ -751,6 +825,9 @@ export function PricingCalculator({
                 <dd className="text-right">
                   <span className="block font-medium tabular-nums">
                     {countFormat.format(estimate.sourceRecords)}
+                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                      per month
+                    </span>
                   </span>
                 </dd>
               </div>
@@ -762,46 +839,63 @@ export function PricingCalculator({
                 <dd className="text-right">
                   <span className="block font-medium tabular-nums">
                     {countFormat.format(estimate.projectRecords)}
+                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                      per month
+                    </span>
                   </span>
                 </dd>
               </div>
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start justify-between gap-4 border-t pt-4">
                 <EstimateHint
-                  label="Credits Used"
+                  label="Estimated Credits"
                   hint={`One credit is 1M Records`}
                 />
                 <dd className="text-right">
                   <span className="block font-medium tabular-nums">
                     {countFormat.format(estimate.credits)}
-                  </span>
-                </dd>
-              </div>
-              <div className="flex items-start justify-between gap-4">
-                <EstimateHint label="Automations" />
-                <dd className="text-right">
-                  <span className="block font-medium tabular-nums">
-                    {countFormat.format(estimate.automationRecords)}
+                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                      per month
+                    </span>
                   </span>
                 </dd>
               </div>
             </dl>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Suggested Plan</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-1 text-left">
-            <p className="text-base font-medium">{suggestedPlan.name}</p>
-            <p className="font-medium tabular-nums">
-              {moneyFormat.format(suggestedPlan.annualPrice)}
-              <span className="font-normal text-muted-foreground"> / year</span>
-            </p>
-            <span className="block font-normal text-muted-foreground">
-              Includes {countFormat.format(suggestedPlan.annualCredits)} credits
-            </span>
-          </CardContent>
-        </Card>
+        <a
+          href="/plans"
+          className="block rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <Card className="h-full transition-colors hover:bg-muted/40">
+            <CardHeader>
+              <CardTitle>Suggested Plan</CardTitle>
+              <CardAction>
+                <span
+                  className={buttonVariants({
+                    size: "xs",
+                    className: "bg-violet-600 text-white hover:bg-violet-700",
+                  })}
+                >
+                  more info →
+                </span>
+              </CardAction>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-1 text-left">
+              <p className="text-base font-medium">{suggestedPlan.name}</p>
+              <p className="font-medium tabular-nums">
+                {moneyFormat.format(suggestedPlan.annualPrice)}
+                <span className="font-normal text-muted-foreground">
+                  {" "}
+                  / year
+                </span>
+              </p>
+              <span className="block font-normal text-muted-foreground">
+                Includes {countFormat.format(suggestedPlan.annualCredits)}{" "}
+                credits
+              </span>
+            </CardContent>
+          </Card>
+        </a>
       </div>
     </div>
   );
