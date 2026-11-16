@@ -1,19 +1,81 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import {
+  ChartColumnIcon,
+  CoinsIcon,
+  DatabaseIcon,
+  FolderPlusIcon,
+  InfinityIcon,
+  PlugIcon,
+  Plus,
+  RefreshCwIcon,
+  SquarePenIcon,
+  UsersIcon,
+} from "lucide-react";
 import { PricingCalculator } from "@/components/pricing-calculator";
 import { buttonVariants } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { defaultQuoteTitle, type SavedForm } from "@/lib/saved-form";
 
 const creditRows = [
-  { label: "Creating new projects", free: false },
-  { label: "Syncing more data", free: false },
-  { label: "Editing a project", free: true },
-  { label: "Unlimited data updates", free: true },
-  { label: "Data visualizations", free: true },
-  { label: "MCP and API", free: true },
-];
+  { label: "Creating new projects", Icon: FolderPlusIcon, pricing: "credit" },
+  { label: "Syncing more data", Icon: DatabaseIcon, pricing: "credit" },
+  { label: "Editing a project", Icon: SquarePenIcon, pricing: "unlimited" },
+  { label: "Data refresh", Icon: RefreshCwIcon, pricing: "unlimited" },
+  { label: "Data visualizations", Icon: ChartColumnIcon, pricing: "unlimited" },
+  { label: "MCP and API", Icon: PlugIcon, pricing: "unlimited" },
+  { label: "Users", Icon: UsersIcon, pricing: "unlimited" },
+] as const;
+
+const pricingStyles = {
+  credit: {
+    label: "Per credit",
+    Icon: CoinsIcon,
+    hint: "Based on the amount of data processed",
+    className:
+      "bg-amber-50 text-amber-800 ring-amber-600/20 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-400/25",
+  },
+  unlimited: {
+    label: "Unlimited",
+    Icon: InfinityIcon,
+    hint: undefined,
+    className:
+      "bg-emerald-50 text-emerald-800 ring-emerald-600/20 dark:bg-emerald-400/10 dark:text-emerald-300 dark:ring-emerald-400/25",
+  },
+} as const;
+
+function PricingPill({ pricing }: { pricing: keyof typeof pricingStyles }) {
+  const { label, Icon, hint, className } = pricingStyles[pricing];
+  const pillClassName = `inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap ring-1 ring-inset ${className}`;
+  const content = (
+    <>
+      <Icon aria-hidden="true" className="size-3.5" />
+      {label}
+    </>
+  );
+
+  if (!hint) {
+    return <span className={pillClassName}>{content}</span>;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        type="button"
+        aria-label={`${label}: ${hint}`}
+        className={`${pillClassName} cursor-help outline-none focus-visible:ring-3 focus-visible:ring-ring/50`}
+      >
+        {content}
+      </TooltipTrigger>
+      <TooltipContent>{hint}</TooltipContent>
+    </Tooltip>
+  );
+}
 
 export function CalculatorScreen({
   quoteId,
@@ -68,7 +130,7 @@ export function CalculatorScreen({
       >
         <div className="overflow-x-auto rounded-xl border">
           <table className="w-full border-collapse text-sm">
-            <caption className="sr-only">What counts as a credit</caption>
+            <caption className="sr-only">Feature pricing</caption>
             <thead>
               <tr className="border-b">
                 <th className="px-4 py-3 text-left font-medium" scope="col">
@@ -78,13 +140,7 @@ export function CalculatorScreen({
                   className="px-4 py-3 text-center font-medium whitespace-nowrap"
                   scope="col"
                 >
-                  Consumes credits
-                </th>
-                <th
-                  className="px-4 py-3 text-center font-medium whitespace-nowrap"
-                  scope="col"
-                >
-                  Included for free
+                  Pricing
                 </th>
               </tr>
             </thead>
@@ -92,27 +148,15 @@ export function CalculatorScreen({
               {creditRows.map((row) => (
                 <tr key={row.label} className="border-b last:border-b-0">
                   <th className="px-4 py-3 text-left font-normal" scope="row">
-                    {row.label}
+                    <span className="flex items-center gap-3">
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                        <row.Icon aria-hidden="true" className="size-4" />
+                      </span>
+                      {row.label}
+                    </span>
                   </th>
                   <td className="px-4 py-3 text-center">
-                    {row.free ? (
-                      <span className="sr-only">Does not consume credits</span>
-                    ) : (
-                      <span>
-                        <span aria-hidden="true">✅</span>
-                        <span className="sr-only">Consumes credits</span>
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {row.free ? (
-                      <span>
-                        <span aria-hidden="true">✅</span>
-                        <span className="sr-only">Included for free</span>
-                      </span>
-                    ) : (
-                      <span className="sr-only">Not included</span>
-                    )}
+                    <PricingPill pricing={row.pricing} />
                   </td>
                 </tr>
               ))}

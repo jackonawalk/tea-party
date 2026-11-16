@@ -28,6 +28,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { priceUsage } from "@/lib/pricing";
+import { GrappleLogo } from "@/components/grapple-logo";
+import { compareStack } from "@/lib/compare";
 import { suggestPlan } from "@/lib/plans";
 import {
   defaultPricePerCreditText,
@@ -608,6 +610,8 @@ export function PricingCalculator({
   });
 
   const suggestedPlan = suggestPlan(estimate.credits);
+  const comparison = compareStack(estimate);
+  const comparisonSavings = comparison.annualTotal - suggestedPlan.annualPrice;
 
   useAutosave({
     quoteId,
@@ -841,7 +845,7 @@ export function PricingCalculator({
               <div className="flex items-start justify-between gap-4 border-t pt-4">
                 <EstimateHint
                   label="Estimated Credits"
-                  hint={`One credit is 1M Records`}
+                  hint={`One credit is 1 million records`}
                 />
                 <dd className="text-right">
                   <span className="block font-medium tabular-nums">
@@ -889,6 +893,46 @@ export function PricingCalculator({
             </CardContent>
           </Card>
         </a>
+        <Card>
+          <CardHeader>
+            <CardTitle>Old School:</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <dl className="flex flex-col gap-4">
+              {comparison.lines.map((line) => (
+                <div
+                  key={line.name}
+                  className="flex items-start justify-between gap-4"
+                >
+                  <EstimateHint label={line.name} hint={line.hint} />
+                  <dd className="text-right font-medium tabular-nums">
+                    {moneyFormat.format(line.annualPrice)}
+                    <span className="font-normal text-muted-foreground">
+                      {" "}
+                      / year
+                    </span>
+                  </dd>
+                </div>
+              ))}
+              <div className="flex items-start justify-between gap-4 border-t pt-4">
+                <dt className="font-medium">Total</dt>
+                <dd className="text-right font-medium tabular-nums">
+                  {moneyFormat.format(comparison.annualTotal)}
+                  <span className="font-normal text-muted-foreground">
+                    {" "}
+                    / year
+                  </span>
+                </dd>
+              </div>
+            </dl>
+            {comparisonSavings > 0 ? (
+              <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm leading-6 text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-300">
+                Save {moneyFormat.format(comparisonSavings)} per year with{" "}
+                <GrappleLogo className="inline-block h-3.5 w-auto -translate-y-px align-middle" />
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
