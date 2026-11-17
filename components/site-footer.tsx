@@ -36,9 +36,9 @@ export function SiteFooter() {
     <Accordion>
       <AccordionItem
         value="faq"
-        className="rounded-xl border-b-0 bg-card px-3 ring-1 ring-foreground/10"
+        className="rounded-xl not-last:border-b-0 bg-card px-3 ring-1 ring-foreground/10"
       >
-        <AccordionTrigger className="px-0 py-3 text-base hover:no-underline">
+        <AccordionTrigger className="items-center px-0 py-3 text-base hover:no-underline">
           FAQ
         </AccordionTrigger>
         <AccordionContent>

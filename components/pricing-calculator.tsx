@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { GeneratedKind } from "@/lib/saved-form";
-import { Eye, EyeOff, Info, Trash2 } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Info, Trash2 } from "lucide-react";
 import CreatableSelect from "react-select/creatable";
 import type { StylesConfig } from "react-select";
 import {
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/accordion";
 import { SiteFooter } from "@/components/site-footer";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "cn";
 import {
   Card,
   CardAction,
@@ -300,9 +301,9 @@ function DiagramBlock({
 }
 
 const sectionItemClass =
-  "rounded-xl border-b-0 bg-card px-3 ring-1 ring-foreground/10";
+  "rounded-xl not-last:border-b-0 bg-card px-3 ring-1 ring-foreground/10";
 
-const sectionTriggerClass = "items-baseline px-0 py-3 hover:no-underline";
+const sectionTriggerClass = "items-center px-0 py-3 hover:no-underline";
 
 function SectionHeading({
   step,
@@ -609,7 +610,28 @@ export function PricingCalculator({
     pricePerCredit: parseCount(pricePerCredit),
   });
 
+  // The plan and comparison stay hidden until sources or projects have records.
+  const hasUsage = estimate.sourceRecords > 0 || estimate.projectRecords > 0;
   const suggestedPlan = suggestPlan(estimate.credits);
+
+  // Each section opens the next one the first time its records go above zero.
+  // A section the user closes afterwards stays closed.
+  const [openSections, setOpenSections] = useState<string[]>(["sources"]);
+  const [autoOpened, setAutoOpened] = useState<string[]>([]);
+  const sectionsToAutoOpen = [
+    estimate.sourceRecords > 0 ? "project" : null,
+    estimate.projectRecords > 0 ? "automation" : null,
+  ].filter(
+    (section): section is string =>
+      section !== null && !autoOpened.includes(section),
+  );
+  if (sectionsToAutoOpen.length > 0) {
+    setAutoOpened([...autoOpened, ...sectionsToAutoOpen]);
+    setOpenSections((current) => [
+      ...current,
+      ...sectionsToAutoOpen.filter((section) => !current.includes(section)),
+    ]);
+  }
   const comparison = compareStack(estimate);
   const comparisonSavings = comparison.annualTotal - suggestedPlan.annualPrice;
 
@@ -700,7 +722,14 @@ export function PricingCalculator({
             event.preventDefault();
           }}
         >
-          <Accordion multiple defaultValue={["sources"]} className="gap-4">
+          <Accordion
+            multiple
+            value={openSections}
+            onValueChange={(value) => {
+              setOpenSections(value as string[]);
+            }}
+            className="gap-4"
+          >
             <AccordionItem value="sources" className={sectionItemClass}>
               <AccordionTrigger className={sectionTriggerClass}>
                 <SectionHeading
@@ -859,80 +888,89 @@ export function PricingCalculator({
             </dl>
           </CardContent>
         </Card>
-        <a
-          href="/plans"
-          className="block rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <Card className="h-full transition-colors hover:bg-muted/40">
-            <CardHeader>
-              <CardTitle>Suggested Plan</CardTitle>
-              <CardAction>
-                <span
-                  className={buttonVariants({
-                    size: "xs",
-                    className: "bg-violet-600 text-white hover:bg-violet-700",
-                  })}
-                >
-                  more info →
-                </span>
-              </CardAction>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-1 text-left">
-              <p className="text-base font-medium">{suggestedPlan.name}</p>
-              <p className="font-medium tabular-nums">
-                {moneyFormat.format(suggestedPlan.annualPrice)}
-                <span className="font-normal text-muted-foreground">
-                  {" "}
-                  / year
-                </span>
-              </p>
-              <span className="block font-normal text-muted-foreground">
-                Includes {countFormat.format(suggestedPlan.annualCredits)}{" "}
-                credits
-              </span>
-            </CardContent>
-          </Card>
-        </a>
-        <Card>
-          <CardHeader>
-            <CardTitle>Old School:</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <dl className="flex flex-col gap-4">
-              {comparison.lines.map((line) => (
-                <div
-                  key={line.name}
-                  className="flex items-start justify-between gap-4"
-                >
-                  <EstimateHint label={line.name} hint={line.hint} />
-                  <dd className="text-right font-medium tabular-nums">
-                    {moneyFormat.format(line.annualPrice)}
+        {hasUsage ? (
+          <>
+            <a
+              href="/plans"
+              className="group/plan block rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <Card className="h-full transition-colors hover:bg-muted/40">
+                <CardHeader>
+                  <CardTitle>Suggested Plan</CardTitle>
+                  <CardAction>
+                    <span
+                      className={cn(
+                        buttonVariants({ size: "xs" }),
+                        "font-medium shadow-sm shadow-primary/30 group-hover/plan:bg-primary/85",
+                      )}
+                    >
+                      Compare plans
+                      <ArrowRight
+                        data-icon="inline-end"
+                        aria-hidden="true"
+                        className="transition-transform group-hover/plan:translate-x-0.5"
+                      />
+                    </span>
+                  </CardAction>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-1 text-left">
+                  <p className="text-base font-medium">{suggestedPlan.name}</p>
+                  <p className="font-medium tabular-nums">
+                    {moneyFormat.format(suggestedPlan.annualPrice)}
                     <span className="font-normal text-muted-foreground">
                       {" "}
                       / year
                     </span>
-                  </dd>
-                </div>
-              ))}
-              <div className="flex items-start justify-between gap-4 border-t pt-4">
-                <dt className="font-medium">Total</dt>
-                <dd className="text-right font-medium tabular-nums">
-                  {moneyFormat.format(comparison.annualTotal)}
-                  <span className="font-normal text-muted-foreground">
-                    {" "}
-                    / year
+                  </p>
+                  <span className="block font-normal text-muted-foreground">
+                    Includes {countFormat.format(suggestedPlan.annualCredits)}{" "}
+                    credits
                   </span>
-                </dd>
-              </div>
-            </dl>
-            {comparisonSavings > 0 ? (
-              <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm leading-6 text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-300">
-                Save {moneyFormat.format(comparisonSavings)} per year with{" "}
-                <GrappleLogo className="inline-block h-3.5 w-auto -translate-y-px align-middle" />
-              </p>
-            ) : null}
-          </CardContent>
-        </Card>
+                </CardContent>
+              </Card>
+            </a>
+            <Card>
+              <CardHeader>
+                <CardTitle>Old School:</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                <dl className="flex flex-col gap-4">
+                  {comparison.lines.map((line) => (
+                    <div
+                      key={line.name}
+                      className="flex items-start justify-between gap-4"
+                    >
+                      <EstimateHint label={line.name} hint={line.hint} />
+                      <dd className="text-right font-medium tabular-nums">
+                        {moneyFormat.format(line.annualPrice)}
+                        <span className="font-normal text-muted-foreground">
+                          {" "}
+                          / year
+                        </span>
+                      </dd>
+                    </div>
+                  ))}
+                  <div className="flex items-start justify-between gap-4 border-t pt-4">
+                    <dt className="font-medium">Total</dt>
+                    <dd className="text-right font-medium tabular-nums">
+                      {moneyFormat.format(comparison.annualTotal)}
+                      <span className="font-normal text-muted-foreground">
+                        {" "}
+                        / year
+                      </span>
+                    </dd>
+                  </div>
+                </dl>
+                {comparisonSavings > 0 ? (
+                  <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm leading-6 text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-300">
+                    Save {moneyFormat.format(comparisonSavings)} per year with{" "}
+                    <GrappleLogo className="inline-block h-3.5 w-auto -translate-y-px align-middle" />
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+          </>
+        ) : null}
       </div>
     </div>
   );
